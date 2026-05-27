@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <Button
+        android:id="@+id/startButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="START TRACKING" />
+
+    <Button
+        android:id="@+id/stopButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="STOP TRACKING" />
+
+    <TextView
+        android:id="@+id/goldText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="22sp"
+        android:layout_marginTop="30dp"
+        android:text="Gold: 0"/>
+
+    <TextView
+        android:id="@+id/ornsText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="22sp"
+        android:text="Orns: 0"/>
+
+    <TextView
+        android:id="@+id/expText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="22sp"
+        android:text="EXP: 0"/>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="406dp"
+        android:layout_marginTop="16dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:id="@+id/historyContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+    </ScrollView>
+
+</LinearLayout>

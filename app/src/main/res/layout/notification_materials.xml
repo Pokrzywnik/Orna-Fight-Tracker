@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/todayTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Materials Available Today:"
+        android:textStyle="bold"
+        android:textSize="16sp"/>
+
+    <LinearLayout
+        android:id="@+id/todayContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="6dp"/>
+
+    <TextView
+        android:id="@+id/tomorrowTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Materials Available Tomorrow:"
+        android:textStyle="bold"
+        android:textSize="16sp"
+        android:paddingTop="12dp"/>
+
+    <LinearLayout
+        android:id="@+id/tomorrowContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="6dp"/>
+
+</LinearLayout>

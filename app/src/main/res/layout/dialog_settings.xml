@@ -1,0 +1,93 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <TextView
+        android:text="Scan interval (ms)"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+    <EditText
+        android:id="@+id/scanIntervalInput"
+        android:inputType="number"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
+
+    <TextView
+        android:text="Codex source"
+        android:layout_marginTop="16dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+    <RadioGroup
+        android:id="@+id/codexGroup"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content">
+
+        <RadioButton
+            android:id="@+id/radioAussie"
+            android:text="Aussie Codex"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <RadioButton
+            android:id="@+id/radioYaco"
+            android:text="Codex Yaco"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+    </RadioGroup>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="12dp"
+        android:background="#333A2D2D" />
+<CheckBox
+    android:id="@+id/materialNotifyCheck"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="Show notification when material is available?" />
+<TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="Notification time"
+    android:textStyle="bold"
+    android:layout_marginTop="12dp"/>
+
+    <TimePicker
+        android:id="@+id/materialTimePicker"
+        android:layout_width="361dp"
+        android:layout_height="131dp"
+        android:layout_marginTop="8dp"
+        android:timePickerMode="spinner" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="12dp"
+        android:background="#33000000" />
+<TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="Selected Materials Aura"
+    android:textStyle="bold"
+    android:layout_marginTop="16dp"/>
+
+<Spinner
+    android:id="@+id/auraSpinner"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content" />
+
+<ImageView
+    android:id="@+id/auraPreview"
+    android:layout_width="120dp"
+    android:layout_height="120dp"
+    android:layout_gravity="center_horizontal"
+    android:layout_marginTop="12dp"
+    android:scaleType="fitCenter"/>
+</LinearLayout>
