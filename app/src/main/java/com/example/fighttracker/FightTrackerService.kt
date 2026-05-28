@@ -226,22 +226,18 @@ class FightTrackerService : Service() {
         image.close()
 
 
-        val cleanedBitmap = removeIconsAndEnhance(croppedBitmap)
+        val scaledBitmap = Bitmap.createScaledBitmap(
+            croppedBitmap,
+            croppedBitmap.width / 2,
+            croppedBitmap.height / 2,
+            false
+        )
+
+        val cleanedBitmap = removeIconsAndEnhance(scaledBitmap)
 
         val inputImage =
             InputImage.fromBitmap(cleanedBitmap, 0)
 
-
-        // DEBUG - FULL FRAME LOGS
-        val debugFullImage = InputImage.fromBitmap(fullBitmap, 0)
-
-        recognizer.process(debugFullImage)
-            .addOnSuccessListener { visionText ->
-
-                Log.d("OCR_RAW", "================ OCR FRAME ================")
-                Log.d("OCR_RAW", visionText.text)
-            }
-        // end debug
 
 
         Log.d(
@@ -274,6 +270,10 @@ class FightTrackerService : Service() {
                 ) {
                     parseRewards(text)
                 }
+                fullBitmap.recycle()
+                croppedBitmap.recycle()
+                scaledBitmap.recycle()
+                cleanedBitmap.recycle()
             }
             .addOnFailureListener { e ->
                 Log.e("OCR_RAW", "OCR FAILED", e)
