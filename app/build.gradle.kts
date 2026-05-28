@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.fighttracker"
+    namespace = "com.frodo.fighttracker"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.fighttracker"
+        applicationId = "com.frodo.fighttracker"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

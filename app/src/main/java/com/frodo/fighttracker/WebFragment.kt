@@ -1,4 +1,4 @@
-package com.example.fighttracker
+package com.frodo.fighttracker
 
 import android.annotation.SuppressLint
 import android.os.Bundle
@@ -7,7 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebViewClient
 import androidx.fragment.app.Fragment
-import com.example.fighttracker.databinding.FragmentWebBinding
+import com.frodo.fighttracker.databinding.FragmentWebBinding
 
 class WebFragment : Fragment() {
 

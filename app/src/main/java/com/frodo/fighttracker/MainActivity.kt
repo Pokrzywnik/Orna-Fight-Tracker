@@ -1,4 +1,4 @@
-package com.example.fighttracker
+package com.frodo.fighttracker
 
 import android.app.Activity
 import android.content.BroadcastReceiver
@@ -12,7 +12,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import com.example.fighttracker.databinding.ActivityMainBinding
+import com.frodo.fighttracker.databinding.ActivityMainBinding
 import android.widget.TextView
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -27,6 +27,7 @@ import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import android.widget.TimePicker
+import android.app.AlarmManager
 
 private var isFloatingEnabled = false
 
@@ -229,6 +230,21 @@ class MainActivity : AppCompatActivity() {
 //            }
 //    }
     override fun onCreate(savedInstanceState: Bundle?) {
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+
+        val alarmManager =
+            getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+        if (!alarmManager.canScheduleExactAlarms()) {
+
+            val intent = Intent(
+                Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM
+            )
+
+            startActivity(intent)
+        }
+    }
 
         super.onCreate(savedInstanceState)
         MaterialAlarmScheduler.schedule(this)

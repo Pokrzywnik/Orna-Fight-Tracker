@@ -1,4 +1,4 @@
-package com.example.fighttracker
+package com.frodo.fighttracker
 
 import android.content.BroadcastReceiver
 import android.content.Context

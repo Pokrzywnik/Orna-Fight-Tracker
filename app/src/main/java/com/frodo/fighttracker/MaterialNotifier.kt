@@ -1,4 +1,4 @@
-package com.example.fighttracker
+package com.frodo.fighttracker
 
 import android.app.NotificationChannel
 import android.app.NotificationManager

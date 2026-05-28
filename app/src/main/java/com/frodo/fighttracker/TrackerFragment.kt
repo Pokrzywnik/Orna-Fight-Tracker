@@ -1,4 +1,4 @@
-package com.example.fighttracker
+package com.frodo.fighttracker
 
 import android.os.Bundle
 import android.os.Handler
@@ -7,7 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
-import com.example.fighttracker.databinding.FragmentTrackerBinding
+import com.frodo.fighttracker.databinding.FragmentTrackerBinding
 import android.content.Context
 import android.content.Intent
 import android.util.Log
