@@ -231,10 +231,26 @@ class FightTrackerService : Service() {
         val inputImage =
             InputImage.fromBitmap(cleanedBitmap, 0)
 
+
+        // DEBUG - FULL FRAME LOGS
+        val debugFullImage = InputImage.fromBitmap(fullBitmap, 0)
+
+        recognizer.process(debugFullImage)
+            .addOnSuccessListener { visionText ->
+
+                Log.d("OCR_RAW", "================ OCR FRAME ================")
+                Log.d("OCR_RAW", visionText.text)
+            }
+        // end debug
+
+
         Log.d(
             "OCR_BITMAP",
             "Processed bitmap: ${cleanedBitmap.width}x${cleanedBitmap.height}"
         )
+
+
+
 
         recognizer.process(inputImage)
             .addOnSuccessListener { visionText ->

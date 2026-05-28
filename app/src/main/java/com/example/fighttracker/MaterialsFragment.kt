@@ -413,12 +413,14 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
                 )
 
                 scaleType = ImageView.ScaleType.FIT_CENTER
+                setLayerType(View.LAYER_TYPE_SOFTWARE, null)
 
                 val auraName = getSelectedAura()
 
                 load("file:///android_asset/aura/$auraName") {
                     crossfade(false)
                 }
+                drawable?.setFilterBitmap(false)
             }
 
             frame.addView(aura)
@@ -436,7 +438,21 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
 
             scaleType = ImageView.ScaleType.FIT_CENTER
 
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+
             load(getMaterialIconUrl(material)) {
+
+                crossfade(false)
+
+                allowHardware(false)
+
+                listener(
+                    onSuccess = { _, result ->
+
+                        drawable?.setFilterBitmap(false)
+                    }
+                )
+
                 error(android.R.drawable.ic_menu_help)
             }
         }
@@ -544,7 +560,8 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
             "Eyestone" to "eye",
 
             "Wolf's Blood" to "wolf_blood",
-            "Demonic Ore" to "demonstone"
+            "Demonic Ore" to "demonstone",
+            "Darkstone" to "dark_stone"
 
         )
 
