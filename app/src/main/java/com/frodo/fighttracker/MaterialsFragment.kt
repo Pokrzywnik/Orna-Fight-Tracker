@@ -22,14 +22,21 @@ class MaterialsFragment : Fragment() {
 
     private lateinit var root: LinearLayout
 
-    private val files = listOf(
-        "remembrance.csv",
-        "coral.csv",
-        "anguish_1_0.csv",
-        "sparring.csv",
-        "trials.csv",
-        "towers.csv"
-    )
+    private fun getFiles(): List<String> {
+        val anguish = when (SettingsStore.getAnguishVersion(requireContext())) {
+            "2.0" -> "anguish_2_0.csv"
+            else -> "anguish_1_0.csv"
+        }
+
+        return listOf(
+            "remembrance.csv",
+            "coral.csv",
+            anguish,
+            "sparring.csv",
+            "trials.csv",
+            "towers.csv"
+        )
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -75,8 +82,8 @@ class MaterialsFragment : Fragment() {
 
         val allEntries = mutableListOf<MaterialEntry>()
 
-        files.forEach {
-            allEntries.addAll(loadCsv(it))
+        getFiles().forEach { file ->
+            allEntries.addAll(loadCsv(file))
         }
 
         val todayItems = allEntries
@@ -107,7 +114,7 @@ class MaterialsFragment : Fragment() {
 
         root.addView(filterButton)
 
-        files.forEach { file ->
+        getFiles().forEach { file ->
 
             val entries = loadCsv(file)
 
@@ -378,15 +385,10 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
     }
 
     private fun createMaterialIcon(material: String): View {
-
         val root = LinearLayout(requireContext()).apply {
-
             orientation = LinearLayout.VERTICAL
-
             gravity = Gravity.CENTER
-
             setPadding(4, 8, 4, 8)
-
             layoutParams = LinearLayout.LayoutParams(
                 0,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -395,78 +397,45 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
         }
 
         val frame = android.widget.FrameLayout(requireContext()).apply {
-
-            val size = (76 * resources.displayMetrics.density).toInt()
-
+            val dp = resources.displayMetrics.density
+            val size = (76 * dp).toInt()
             layoutParams = LinearLayout.LayoutParams(size, size)
-
             foregroundGravity = Gravity.CENTER
         }
 
         if (SelectedMaterials.selected.contains(material)) {
-
-            val aura = ImageView(requireContext()).apply {
-
+            val aura = AuraWebView(requireContext()).apply {
                 layoutParams = android.widget.FrameLayout.LayoutParams(
                     android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                     android.widget.FrameLayout.LayoutParams.MATCH_PARENT
                 )
-
-                scaleType = ImageView.ScaleType.FIT_CENTER
-                setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-
                 val auraName = getSelectedAura()
-
-                load("file:///android_asset/aura/$auraName") {
-                    crossfade(false)
-                }
-                drawable?.setFilterBitmap(false)
+                loadAura(auraName)
             }
-
-            frame.addView(aura)
+            frame.addView(aura) // added first = behind
         }
 
         val image = ImageView(requireContext()).apply {
-
-            val iconSize = (40 * resources.displayMetrics.density).toInt()
-
+            val dp = resources.displayMetrics.density
+            val iconSize = (40 * dp).toInt()
             layoutParams = android.widget.FrameLayout.LayoutParams(
                 iconSize,
                 iconSize,
                 Gravity.CENTER
             )
-
             scaleType = ImageView.ScaleType.FIT_CENTER
-
-            setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-
             load(getMaterialIconUrl(material)) {
-
                 crossfade(false)
-
-                allowHardware(false)
-
-                listener(
-                    onSuccess = { _, result ->
-
-                        drawable?.setFilterBitmap(false)
-                    }
-                )
-
                 error(android.R.drawable.ic_menu_help)
             }
         }
 
-        frame.addView(image)
+        frame.addView(image) // added second = on top
 
         val text = TextView(requireContext()).apply {
-
             this.text = material
-
             textSize = 10f
-
             gravity = Gravity.CENTER
-
             setPadding(0, 4, 0, 0)
         }
 
@@ -486,10 +455,26 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
             orientation = LinearLayout.VERTICAL
             setPadding(32, 32, 32, 32)
 
-            background = resources.getDrawable(
-                android.R.drawable.dialog_holo_light_frame,
-                null
-            )
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = 24f
+
+                setColor(
+                    com.google.android.material.color.MaterialColors.getColor(
+                        context,
+                        com.google.android.material.R.attr.colorSurface,
+                        0
+                    )
+                )
+
+                setStroke(
+                    2,
+                    com.google.android.material.color.MaterialColors.getColor(
+                        context,
+                        com.google.android.material.R.attr.colorOutline,
+                        0
+                    )
+                )
+            }
 
             val params = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,

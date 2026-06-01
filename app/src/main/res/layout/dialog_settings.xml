@@ -1,9 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
     android:padding="20dp"
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
 
+    <!-- Scan interval -->
     <TextView
         android:text="Scan interval (ms)"
         android:layout_width="wrap_content"
@@ -15,48 +17,104 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
 
-    <TextView
-        android:text="Codex source"
-        android:layout_marginTop="16dp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"/>
+    <!-- ========================= -->
+    <!-- CODEx + ANGUISH ROW -->
+    <!-- ========================= -->
 
-    <RadioGroup
-        android:id="@+id/codexGroup"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="16dp">
 
-        <RadioButton
-            android:id="@+id/radioAussie"
-            android:text="Aussie Codex"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"/>
+        <!-- CODEx -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
 
-        <RadioButton
-            android:id="@+id/radioYaco"
-            android:text="Codex Yaco"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"/>
+            <TextView
+                android:text="Codex source"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
 
-    </RadioGroup>
+            <RadioGroup
+                android:id="@+id/codexGroup"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content">
 
+                <RadioButton
+                    android:id="@+id/radioAussie"
+                    android:text="Aussie Codex"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"/>
+
+                <RadioButton
+                    android:id="@+id/radioYaco"
+                    android:text="Codex Yaco"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"/>
+            </RadioGroup>
+
+        </LinearLayout>
+
+        <!-- ANGUISH -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingStart="16dp">
+
+            <TextView
+                android:text="Anguish version"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+            <RadioGroup
+                android:id="@+id/anguishGroup"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content">
+
+                <RadioButton
+                    android:id="@+id/radioAnguish1"
+                    android:text="1.0"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"/>
+
+                <RadioButton
+                    android:id="@+id/radioAnguish2"
+                    android:text="2.0"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"/>
+            </RadioGroup>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Divider -->
     <View
         android:layout_width="match_parent"
         android:layout_height="3dp"
         android:layout_marginTop="12dp"
         android:layout_marginBottom="12dp"
         android:background="#333A2D2D" />
-<CheckBox
-    android:id="@+id/materialNotifyCheck"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:text="Show notification when material is available?" />
-<TextView
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:text="Notification time"
-    android:textStyle="bold"
-    android:layout_marginTop="12dp"/>
+
+    <!-- Notifications -->
+    <CheckBox
+        android:id="@+id/materialNotifyCheck"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Show notification when material is available?" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Notification time"
+        android:textStyle="bold"
+        android:layout_marginTop="12dp"/>
 
     <TimePicker
         android:id="@+id/materialTimePicker"
@@ -65,29 +123,33 @@
         android:layout_marginTop="8dp"
         android:timePickerMode="spinner" />
 
+    <!-- Divider -->
     <View
         android:layout_width="match_parent"
         android:layout_height="3dp"
         android:layout_marginTop="12dp"
         android:layout_marginBottom="12dp"
         android:background="#33000000" />
-<TextView
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:text="Selected Materials Aura"
-    android:textStyle="bold"
-    android:layout_marginTop="16dp"/>
 
-<Spinner
-    android:id="@+id/auraSpinner"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content" />
+    <!-- Aura -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Selected Materials Aura"
+        android:textStyle="bold"
+        android:layout_marginTop="16dp"/>
 
-<ImageView
-    android:id="@+id/auraPreview"
-    android:layout_width="120dp"
-    android:layout_height="120dp"
-    android:layout_gravity="center_horizontal"
-    android:layout_marginTop="12dp"
-    android:scaleType="fitCenter"/>
+    <Spinner
+        android:id="@+id/auraSpinner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <ImageView
+        android:id="@+id/auraPreview"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="12dp"
+        android:scaleType="fitCenter"/>
+
 </LinearLayout>

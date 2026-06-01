@@ -32,6 +32,21 @@ import android.app.AlarmManager
 private var isFloatingEnabled = false
 
 object SettingsStore {
+
+    private const val KEY_ANGUISH_VERSION = "anguish_version"
+
+    fun getAnguishVersion(context: Context): String {
+        return context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+            .getString(KEY_ANGUISH_VERSION, "1.0") ?: "1.0"
+    }
+
+    fun setAnguishVersion(context: Context, value: String) {
+        context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_ANGUISH_VERSION, value)
+            .apply()
+    }
+
     private const val KEY_MATERIAL_HOUR = "material_hour"
     private const val KEY_MATERIAL_MIN = "material_min"
 
@@ -393,6 +408,8 @@ class MainActivity : AppCompatActivity() {
     }
     private fun showSettingsDialog() {
 
+
+
         val dialogView = layoutInflater.inflate(R.layout.dialog_settings, null)
 
         val notifyCheck =
@@ -421,7 +438,13 @@ class MainActivity : AppCompatActivity() {
         } else {
             codexGroup.check(R.id.radioYaco)
         }
+        val anguishGroup = dialogView.findViewById<android.widget.RadioGroup>(R.id.anguishGroup)
 
+
+        when (SettingsStore.getAnguishVersion(this)) {
+            "2.0" -> anguishGroup.check(R.id.radioAnguish2)
+            else -> anguishGroup.check(R.id.radioAnguish1)
+        }
 
         // list aura
 
@@ -452,6 +475,8 @@ class MainActivity : AppCompatActivity() {
         fun updatePreview(name: String) {
             auraPreview.load("file:///android_asset/aura/$name") {
                 crossfade(false)
+                allowHardware(false)
+                memoryCachePolicy(coil.request.CachePolicy.DISABLED)
             }
         }
 
@@ -481,6 +506,13 @@ class MainActivity : AppCompatActivity() {
             .setTitle("Settings")
             .setView(dialogView)
             .setPositiveButton("Save") { _, _ ->
+
+                val anguishVersion = when (anguishGroup.checkedRadioButtonId) {
+                    R.id.radioAnguish2 -> "2.0"
+                    else -> "1.0"
+                }
+
+                SettingsStore.setAnguishVersion(this, anguishVersion)
 
                 val timePicker =
                     dialogView.findViewById<TimePicker>(R.id.materialTimePicker)

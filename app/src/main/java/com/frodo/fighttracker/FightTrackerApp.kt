@@ -12,16 +12,14 @@ class FightTrackerApp : Application(), ImageLoaderFactory {
 
     @RequiresApi(Build.VERSION_CODES.P)
     override fun newImageLoader(): ImageLoader {
-
         return ImageLoader.Builder(this)
-
             .components {
-
-                add(ImageDecoderDecoder.Factory())
-
-                add(GifDecoder.Factory())
+                if (Build.VERSION.SDK_INT >= 28) {
+                    add(ImageDecoderDecoder.Factory())
+                } else {
+                    add(GifDecoder.Factory())
+                }
             }
-
             .build()
     }
 }

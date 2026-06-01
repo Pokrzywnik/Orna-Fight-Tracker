@@ -134,7 +134,26 @@ class TrackerFragment : Fragment() {
             val tile = android.widget.LinearLayout(requireContext()).apply {
                 orientation = android.widget.LinearLayout.VERTICAL
                 setPadding(32, 24, 32, 24)
-                setBackgroundResource(android.R.drawable.dialog_holo_light_frame)
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    cornerRadius = 24f
+
+                    setColor(
+                        com.google.android.material.color.MaterialColors.getColor(
+                            context,
+                            com.google.android.material.R.attr.colorSurface,
+                            0
+                        )
+                    )
+
+                    setStroke(
+                        2,
+                        com.google.android.material.color.MaterialColors.getColor(
+                            context,
+                            com.google.android.material.R.attr.colorOutline,
+                            0
+                        )
+                    )
+                }
 
                 val params = android.widget.LinearLayout.LayoutParams(
                     android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
