@@ -30,6 +30,7 @@ import android.widget.TimePicker
 import android.app.AlarmManager
 
 private var isFloatingEnabled = false
+private lateinit var codexFragment: WebFragment
 
 object SettingsStore {
 
@@ -296,10 +297,17 @@ class MainActivity : AppCompatActivity() {
                 MEDIA_PROJECTION_SERVICE
             ) as MediaProjectionManager
 
+
+        val towerFragment =
+            WebFragment.newInstance("https://codex.fqegg.top/#/tower")
+
+        codexFragment =
+            WebFragment.newInstance(getCodexUrl())
+
         val fragments = listOf(
             TrackerFragment(),
-            WebFragment.newInstance("https://codex.fqegg.top/#/tower"),
-            WebFragment.newInstance(getCodexUrl()),
+            towerFragment,
+            codexFragment,
             MaterialsFragment()
         )
 
@@ -537,12 +545,18 @@ class MainActivity : AppCompatActivity() {
                     notifyCheck.isChecked
                 )
 
+                val oldCodex = SettingsStore.getCodexType(this)
+
                 val selectedCodex = when (codexGroup.checkedRadioButtonId) {
                     R.id.radioAussie -> "AUSSIE"
                     else -> "YACO"
                 }
 
                 SettingsStore.setCodexType(this, selectedCodex)
+
+                if (oldCodex != selectedCodex) {
+                    codexFragment.reloadUrl(getCodexUrl())
+                }
 
                 val selectedAura = auraSpinner.selectedItem as String
                 prefs.edit().putString("selected_aura", selectedAura).apply()

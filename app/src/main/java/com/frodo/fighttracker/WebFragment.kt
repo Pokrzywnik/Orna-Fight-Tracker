@@ -53,13 +53,42 @@ class WebFragment : Fragment() {
 
         binding.webView.webViewClient = WebViewClient()
 
-        binding.webView.settings.javaScriptEnabled = true
+        binding.webView.settings.apply {
+            javaScriptEnabled = true
+
+            domStorageEnabled = true
+
+            databaseEnabled = true
+
+            cacheMode =
+                android.webkit.WebSettings.LOAD_DEFAULT
+        }
+
+        val cookieManager =
+            android.webkit.CookieManager.getInstance()
+
+        cookieManager.setAcceptCookie(true)
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            cookieManager.setAcceptThirdPartyCookies(
+                binding.webView,
+                true
+            )
+        }
 
         if (url.isNotEmpty()) {
             binding.webView.loadUrl(url)
         }
 
         return binding.root
+    }
+
+    fun reloadUrl(newUrl: String) {
+        url = newUrl
+
+        if (_binding != null) {
+            binding.webView.loadUrl(newUrl)
+        }
     }
 
     override fun onDestroyView() {

@@ -546,7 +546,8 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
 
             "Wolf's Blood" to "wolf_blood",
             "Demonic Ore" to "demonstone",
-            "Darkstone" to "dark_stone"
+            "Darkstone" to "dark_stone",
+            "Firestone" to "fire_stone"
 
         )
 
