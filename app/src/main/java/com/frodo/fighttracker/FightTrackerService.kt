@@ -37,7 +37,9 @@ class FightTrackerService : Service() {
     private var totalGold = 0L
     private var totalOrns = 0L
     private var totalExp = 0L
+    private var totalShards = 0L
 
+    private var lastShards = -1L
     private var lastGold = -1L
     private var lastOrns = -1L
     private var lastExp = -1L
@@ -287,10 +289,19 @@ class FightTrackerService : Service() {
         var sessionGold = 0L
         var sessionOrns = 0L
         var sessionExp = 0L
+        var sessionShards = 0L
 
         for (line in lines) {
 
             val clean = line.replace(",", "").lowercase()
+
+
+            if (
+                clean.contains("tower shard") ||
+                clean.contains("tower shards")
+            ) {
+                sessionShards += extractNumber(clean)
+            }
 
             if (clean.contains("gold") && !clean.contains("kingdom")) {
                 sessionGold += extractNumber(clean)
@@ -309,7 +320,8 @@ class FightTrackerService : Service() {
         if (
             sessionGold == lastGold &&
             sessionOrns == lastOrns &&
-            sessionExp == lastExp
+            sessionExp == lastExp &&
+            sessionShards == lastShards
         ) {
             return
         }
@@ -318,19 +330,22 @@ class FightTrackerService : Service() {
         lastGold = sessionGold
         lastOrns = sessionOrns
         lastExp = sessionExp
+        lastShards = sessionShards
 
         // add ONLY new results
         totalGold += sessionGold
         totalOrns += sessionOrns
         totalExp += sessionExp
+        totalShards += sessionShards
 
         FightState.gold = totalGold
         FightState.orns = totalOrns
         FightState.exp = totalExp
+        FightState.shards = totalShards
 
         android.util.Log.d(
             "FIGHT_TOTALS",
-            "STATE UPDATE -> EXP=$totalExp GOLD=$totalGold ORNS=$totalOrns"
+            "STATE UPDATE -> EXP=$totalExp GOLD=$totalGold ORNS=$totalOrns SHARDS=$totalShards"
         )
     }
 

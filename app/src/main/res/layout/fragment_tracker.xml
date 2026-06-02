@@ -41,6 +41,12 @@
         android:layout_height="wrap_content"
         android:textSize="22sp"
         android:text="EXP: 0"/>
+    <TextView
+        android:id="@+id/shardsText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="22sp"
+        android:text="Tower Shards: 0"/>
 
     <ScrollView
         android:layout_width="match_parent"

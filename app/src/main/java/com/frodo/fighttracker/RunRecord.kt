@@ -6,5 +6,6 @@ data class RunRecord(
     val duration: String,
     val gold: Long,
     val orns: Long,
-    val exp: Long
+    val exp: Long,
+    val shards: Long
 )

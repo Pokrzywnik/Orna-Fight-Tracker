@@ -218,13 +218,15 @@ class MainActivity : AppCompatActivity() {
                 duration,
                 FightState.gold,
                 FightState.orns,
-                FightState.exp
+                FightState.exp,
+                FightState.shards
             )
         )
 
         FightState.gold = 0L
         FightState.orns = 0L
         FightState.exp = 0L
+        FightState.shards = 0L
     }
 
 //    override fun onResume() {

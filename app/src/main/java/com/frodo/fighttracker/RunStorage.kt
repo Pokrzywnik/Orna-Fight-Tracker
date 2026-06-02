@@ -34,6 +34,7 @@ object RunStorage {
         obj.put("gold", run.gold)
         obj.put("orns", run.orns)
         obj.put("exp", run.exp)
+        obj.put("shards", run.shards)
 
         android.util.Log.d(
             "RUN_HISTORY",
@@ -77,7 +78,8 @@ object RunStorage {
                     obj.getString("duration"),
                     obj.getLong("gold"),
                     obj.getLong("orns"),
-                    obj.getLong("exp")
+                    obj.getLong("exp"),
+                    obj.optLong("shards", 0L)
                 )
             )
         }

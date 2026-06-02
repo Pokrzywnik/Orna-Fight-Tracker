@@ -62,6 +62,15 @@ class TrackerFragment : Fragment() {
                             .reversed()
                     }"
 
+                binding.shardsText.text =
+                    "tower shards: ${
+                        FightState.shards.toString()
+                            .reversed()
+                            .chunked(3)
+                            .joinToString(" ")
+                            .reversed()
+                    }"
+
                 handler.postDelayed(this, 500)
                 if(start==0){
                     renderHistory()
@@ -128,6 +137,7 @@ class TrackerFragment : Fragment() {
         val goldIcon = R.drawable.gold
         val ornsIcon = R.drawable.orns
         val xpIcon = R.drawable.exp_potion
+        val shardIcon = R.drawable.tower_fragment
 
         runs.forEachIndexed { index, run ->
 
@@ -177,6 +187,11 @@ class TrackerFragment : Fragment() {
                 .reversed()
 
             val exp = run.exp.toString()
+                .reversed()
+                .chunked(3)
+                .joinToString(" ")
+                .reversed()
+            val shards = run.shards.toString()
                 .reversed()
                 .chunked(3)
                 .joinToString(" ")
@@ -234,6 +249,15 @@ class TrackerFragment : Fragment() {
             tile.addView(statRow(goldIcon, "Gold", gold))
             tile.addView(statRow(ornsIcon, "Orns", orns))
             tile.addView(statRow(xpIcon, "XP", exp))
+            if (run.shards > 0) {
+                tile.addView(
+                    statRow(
+                        shardIcon,
+                        "Tower Shards",
+                        shards
+                    )
+                )
+            }
             tile.addView(deleteBtn)
 
             binding.historyContainer.addView(tile)

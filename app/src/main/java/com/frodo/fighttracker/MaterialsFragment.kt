@@ -169,6 +169,15 @@ class MaterialsFragment : Fragment() {
                 1f
             )
         }
+        val calendarBtn = android.widget.ImageButton(requireContext()).apply {
+            setImageResource(android.R.drawable.ic_menu_my_calendar)
+
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+
+            setOnClickListener {
+                showMaterialCalendar()
+            }
+        }
 
         val creditsBtn = android.widget.Button(requireContext()).apply {
             text = "Credits"
@@ -179,9 +188,263 @@ class MaterialsFragment : Fragment() {
         }
 
         container.addView(title)
+        container.addView(calendarBtn)
         container.addView(creditsBtn)
 
         return container
+    }
+
+    private fun showMaterialCalendar() {
+
+        val allEntries = mutableListOf<MaterialEntry>()
+
+        getFiles().forEach { file ->
+            allEntries.addAll(loadCsv(file))
+        }
+
+        val materials = allEntries
+            .flatMap { parseItems(it.items) }
+            .distinct()
+            .sorted()
+
+        val layout = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(32, 32, 32, 32)
+        }
+
+        val search = android.widget.EditText(requireContext()).apply {
+            hint = "Search material..."
+        }
+
+        val scroll = ScrollView(requireContext())
+
+        val gridContainer = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        scroll.addView(gridContainer)
+
+        fun render(filter: String = "") {
+
+            gridContainer.removeAllViews()
+
+            val filtered = materials
+                .filter {
+                    it.contains(filter, ignoreCase = true)
+                }
+                .sorted()
+
+            var currentRow: LinearLayout? = null
+
+            filtered.forEachIndexed { index, material ->
+
+                if (index % 4 == 0) {
+
+                    currentRow = LinearLayout(requireContext()).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_HORIZONTAL
+                    }
+
+                    gridContainer.addView(currentRow)
+                }
+
+                currentRow?.addView(
+                    createCalendarMaterialIcon(
+                        material,
+                        allEntries
+                    )
+                )
+            }
+        }
+
+        render()
+
+        search.addTextChangedListener(
+            object : android.text.TextWatcher {
+
+                override fun beforeTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    count: Int,
+                    after: Int
+                ) {}
+
+                override fun onTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    before: Int,
+                    count: Int
+                ) {
+                    render(s.toString())
+                }
+
+                override fun afterTextChanged(
+                    s: android.text.Editable?
+                ) {}
+            }
+        )
+
+        layout.addView(search)
+
+        layout.addView(
+            scroll,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                900
+            )
+        )
+
+        android.app.AlertDialog.Builder(requireContext())
+            .setTitle("Material Calendar")
+            .setView(layout)
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private fun showMaterialDates(
+        material: String,
+        entries: List<MaterialEntry>
+    ) {
+
+        val currentYear = LocalDate.now().year
+        val today = LocalDate.now()
+
+        val englishFormatter =
+            java.time.format.DateTimeFormatter.ofPattern(
+                "MMMM d yyyy",
+                Locale.ENGLISH
+            )
+
+        val deviceLocale =
+            resources.configuration.locales[0]
+
+        val displayFormatter =
+            java.time.format.DateTimeFormatter.ofPattern(
+                "d MMMM",
+                deviceLocale
+            )
+
+        val upcomingDates = entries
+            .filter {
+                parseItems(it.items).contains(material)
+            }
+            .mapNotNull { entry ->
+
+                try {
+
+                    val date = LocalDate.parse(
+                        "${entry.date} $currentYear",
+                        englishFormatter
+                    )
+
+                    if (date >= today) {
+                        date
+                    } else {
+                        date.plusYears(1)
+                    }
+
+                } catch (e: Exception) {
+                    null
+                }
+            }
+            .distinct()
+            .sorted()
+            .take(5)
+
+        val text = buildString {
+
+            append(material)
+            append("\n\n")
+
+            if (upcomingDates.isEmpty()) {
+
+                append("No upcoming dates found.")
+
+            } else {
+
+                upcomingDates.forEach {
+
+                    append("• ")
+                    append(it.format(displayFormatter))
+                    append("\n")
+                }
+            }
+        }
+
+        android.app.AlertDialog.Builder(requireContext())
+            .setTitle(
+                when (resources.configuration.locales[0].language) {
+                    "pl" -> "Najbliższe 5 wystąpień"
+                    else -> "Next 5 Occurrences"
+                }
+            )
+            .setMessage(text)
+            .setPositiveButton("OK", null)
+            .show()
+    }
+
+    private fun createCalendarMaterialIcon(
+        material: String,
+        entries: List<MaterialEntry>
+    ): View {
+
+        val root = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(4, 8, 4, 8)
+
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1f
+            )
+
+            setOnClickListener {
+                showMaterialDates(material, entries)
+            }
+        }
+
+        val image = ImageView(requireContext()).apply {
+
+            val dp = resources.displayMetrics.density
+            val size = (48 * dp).toInt()
+
+            layoutParams = LinearLayout.LayoutParams(
+                size,
+                size
+            )
+
+            scaleType = ImageView.ScaleType.FIT_CENTER
+
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+
+            load(getMaterialIconUrl(material)) {
+
+                crossfade(false)
+
+                allowHardware(false)
+
+                listener(
+                    onSuccess = { _, _ ->
+                        drawable?.setFilterBitmap(false)
+                    }
+                )
+
+                error(android.R.drawable.ic_menu_help)
+            }
+        }
+
+        val text = TextView(requireContext()).apply {
+            this.text = material
+            textSize = 10f
+            gravity = Gravity.CENTER
+            setPadding(0, 4, 0, 0)
+        }
+
+        root.addView(image)
+        root.addView(text)
+
+        return root
     }
 
     private fun showCreditsDialog() {
@@ -385,10 +648,12 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
     }
 
     private fun createMaterialIcon(material: String): View {
+
         val root = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setPadding(4, 8, 4, 8)
+
             layoutParams = LinearLayout.LayoutParams(
                 0,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -397,40 +662,62 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
         }
 
         val frame = android.widget.FrameLayout(requireContext()).apply {
+
             val dp = resources.displayMetrics.density
             val size = (76 * dp).toInt()
+
             layoutParams = LinearLayout.LayoutParams(size, size)
+
             foregroundGravity = Gravity.CENTER
         }
 
         if (SelectedMaterials.selected.contains(material)) {
+
             val aura = AuraWebView(requireContext()).apply {
+
                 layoutParams = android.widget.FrameLayout.LayoutParams(
                     android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                     android.widget.FrameLayout.LayoutParams.MATCH_PARENT
                 )
-                val auraName = getSelectedAura()
-                loadAura(auraName)
+
+                loadAura(getSelectedAura())
             }
-            frame.addView(aura) // added first = behind
+
+            frame.addView(aura)
         }
 
         val image = ImageView(requireContext()).apply {
+
             val dp = resources.displayMetrics.density
             val iconSize = (40 * dp).toInt()
+
             layoutParams = android.widget.FrameLayout.LayoutParams(
                 iconSize,
                 iconSize,
                 Gravity.CENTER
             )
+
             scaleType = ImageView.ScaleType.FIT_CENTER
+
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+
             load(getMaterialIconUrl(material)) {
+
                 crossfade(false)
+
+                allowHardware(false)
+
+                listener(
+                    onSuccess = { _, _ ->
+                        drawable?.setFilterBitmap(false)
+                    }
+                )
+
                 error(android.R.drawable.ic_menu_help)
             }
         }
 
-        frame.addView(image) // added second = on top
+        frame.addView(image)
 
         val text = TextView(requireContext()).apply {
             this.text = material
