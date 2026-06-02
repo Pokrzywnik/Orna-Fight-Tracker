@@ -33,6 +33,7 @@ FightTracker scans the screen using Android MediaProjection and:
   * Gold
   * Orns
   * Experience
+  * Tower Shards
 * Tracks totals across a session
 * Prevents duplicate reward counting
 
@@ -65,12 +66,13 @@ Displays:
 * Materials Today
 * Materials Tomorrow
 * Guild-specific material rotations
+* Materials Calendar (5 next dates for each material)
 
 Sources include:
 
 * Remembrance
 * Coral
-* Anguish
+* Anguish 1.0 / 2.0
 * Sparring
 * Trials
 * Towers
