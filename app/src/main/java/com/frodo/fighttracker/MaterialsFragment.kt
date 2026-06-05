@@ -65,6 +65,20 @@ class MaterialsFragment : Fragment() {
         return scroll
     }
 
+    private fun guildDisplayName(file: String): String {
+
+        return when(file) {
+            "anguish_1_0.csv" -> "Anguish 1.0"
+            "anguish_2_0.csv" -> "Anguish 2.0"
+            "remembrance.csv" -> "Remembrance"
+            "coral.csv" -> "Coral"
+            "sparring.csv" -> "Sparring"
+            "trials.csv" -> "Trials"
+            "towers.csv" -> "Towers"
+            else -> file
+        }
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
 
@@ -126,9 +140,7 @@ class MaterialsFragment : Fragment() {
 
             root.addView(
                 createGuildCard(
-                    file.removeSuffix(".csv")
-                        .replace("_", " ")
-                        .uppercase(),
+                    guildDisplayName(file),
                     todayEntry,
                     tomorrowEntry
                 )
@@ -306,78 +318,96 @@ class MaterialsFragment : Fragment() {
         entries: List<MaterialEntry>
     ) {
 
+        data class MaterialOccurrence(
+            val date: LocalDate,
+            val guild: String
+        )
+
         val currentYear = LocalDate.now().year
         val today = LocalDate.now()
 
-        val englishFormatter =
+        val formatter =
             java.time.format.DateTimeFormatter.ofPattern(
                 "MMMM d yyyy",
                 Locale.ENGLISH
             )
 
-        val deviceLocale =
-            resources.configuration.locales[0]
+        val occurrences = mutableListOf<MaterialOccurrence>()
 
-        val displayFormatter =
-            java.time.format.DateTimeFormatter.ofPattern(
-                "d MMMM",
-                deviceLocale
-            )
+        getFiles().forEach { file ->
 
-        val upcomingDates = entries
-            .filter {
-                parseItems(it.items).contains(material)
-            }
-            .mapNotNull { entry ->
+            val guildName = guildDisplayName(file)
 
-                try {
-
-                    val date = LocalDate.parse(
-                        "${entry.date} $currentYear",
-                        englishFormatter
-                    )
-
-                    if (date >= today) {
-                        date
-                    } else {
-                        date.plusYears(1)
-                    }
-
-                } catch (e: Exception) {
-                    null
+            loadCsv(file)
+                .filter {
+                    parseItems(it.items).contains(material)
                 }
-            }
-            .distinct()
-            .sorted()
-            .take(5)
+                .forEach { entry ->
+
+                    try {
+
+                        var date = LocalDate.parse(
+                            "${entry.date} $currentYear",
+                            formatter
+                        )
+
+                        if (date.isBefore(today)) {
+                            date = date.plusYears(1)
+                        }
+
+                        occurrences.add(
+                            MaterialOccurrence(
+                                date,
+                                guildName
+                            )
+                        )
+
+                    } catch (_: Exception) {
+                    }
+                }
+        }
+
+        val nextFive =
+            occurrences
+                .sortedBy { it.date }
+                .take(5)
 
         val text = buildString {
 
             append(material)
             append("\n\n")
 
-            if (upcomingDates.isEmpty()) {
+            if (nextFive.isEmpty()) {
 
                 append("No upcoming dates found.")
 
             } else {
 
-                upcomingDates.forEach {
+                nextFive.forEach {
 
                     append("• ")
-                    append(it.format(displayFormatter))
+
+                    append(
+                        it.date.month.getDisplayName(
+                            TextStyle.FULL,
+                            Locale.getDefault()
+                        )
+                    )
+
+                    append(" ")
+                    append(it.date.dayOfMonth)
+
+                    append(" (")
+                    append(it.guild)
+                    append(")")
+
                     append("\n")
                 }
             }
         }
 
         android.app.AlertDialog.Builder(requireContext())
-            .setTitle(
-                when (resources.configuration.locales[0].language) {
-                    "pl" -> "Najbliższe 5 wystąpień"
-                    else -> "Next 5 Occurrences"
-                }
-            )
+            .setTitle("Next 5 Occurrences")
             .setMessage(text)
             .setPositiveButton("OK", null)
             .show()

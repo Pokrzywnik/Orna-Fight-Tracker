@@ -55,13 +55,39 @@ class WebFragment : Fragment() {
 
         binding.webView.settings.apply {
             javaScriptEnabled = true
-
             domStorageEnabled = true
-
             databaseEnabled = true
-
             cacheMode =
                 android.webkit.WebSettings.LOAD_DEFAULT
+        }
+
+        binding.webView.setOnTouchListener { v, event ->
+
+            val edgeZone = v.width * 0.35f
+
+            when (event.action) {
+
+                android.view.MotionEvent.ACTION_DOWN -> {
+
+                    val touchingEdge =
+                        event.x < edgeZone ||
+                                event.x > (v.width - edgeZone)
+
+                    if (touchingEdge) {
+                        v.parent.requestDisallowInterceptTouchEvent(false)
+                    } else {
+                        v.parent.requestDisallowInterceptTouchEvent(true)
+                    }
+                }
+
+                android.view.MotionEvent.ACTION_UP,
+                android.view.MotionEvent.ACTION_CANCEL -> {
+
+                    v.parent.requestDisallowInterceptTouchEvent(false)
+                }
+            }
+
+            false
         }
 
         val cookieManager =
