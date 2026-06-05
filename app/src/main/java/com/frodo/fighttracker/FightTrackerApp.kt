@@ -10,6 +10,10 @@ import coil.decode.ImageDecoderDecoder
 
 class FightTrackerApp : Application(), ImageLoaderFactory {
 
+    override fun onCreate() {
+        super.onCreate()
+        CodexRepository.loadFromAssets(this)
+    }
     @RequiresApi(Build.VERSION_CODES.P)
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)

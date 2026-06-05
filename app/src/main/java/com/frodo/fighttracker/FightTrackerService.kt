@@ -248,6 +248,7 @@ class FightTrackerService : Service() {
         )
 
 
+        runAssessOCR(fullBitmap)
 
 
         recognizer.process(inputImage)
@@ -280,6 +281,147 @@ class FightTrackerService : Service() {
             .addOnFailureListener { e ->
                 Log.e("OCR_RAW", "OCR FAILED", e)
             }
+
+
+    }
+
+    private fun runAssessOCR(bitmap: Bitmap) {
+        Log.d("ASSESS", "runAssessOCR called")
+        val cropped = Bitmap.createBitmap(
+            bitmap,
+            (bitmap.width * 0.15).toInt(),
+            (bitmap.height * 0.10).toInt(),
+            (bitmap.width * 0.70).toInt(),
+            (bitmap.height * 0.75).toInt()
+        )
+
+        Log.d(
+            "ASSESS",
+            "crop=${cropped.width}x${cropped.height}"
+        )
+        val input = InputImage.fromBitmap(cropped, 0)
+
+        recognizer.process(input)
+            .addOnSuccessListener { result ->
+
+                Log.d(
+                    "ASSESS_RAW",
+                    "================ FULL OCR FRAME ================"
+                )
+
+                Log.d(
+                    "ASSESS_RAW",
+                    result.text
+                )
+                val parsed = AssessParser.parse(result.text)
+                Log.d(
+                    "ASSESS",
+                    "parsed=$parsed"
+                )
+                parsed?.let { evaluateItem(it) }
+
+                cropped.recycle()
+            }
+            .addOnFailureListener {
+                cropped.recycle()
+            }
+    }
+
+    private fun evaluateItem(item: ParsedItem) {
+
+        Log.d("ASSESS_ITEM", "name=${item.name}")
+
+        val id = normalize(item.name)
+
+        Log.d("ASSESS_ITEM", "normalized=$id")
+
+        val base = CodexRepository.get(id)
+
+        Log.d("ASSESS_ITEM", "repository result=$base")
+
+        if (base == null) {
+            Log.d("ASSESS_ITEM", "ITEM NOT FOUND")
+            return
+        }
+
+        val qualityRange =
+            estimateQualityRange(item, base)
+
+        updateAssessOverlay(
+            item.name,
+            qualityRange
+        )
+    }
+
+    private fun normalize(name: String): String {
+
+        return name
+            .lowercase()
+            .replace("legendary ", "")
+            .replace("ornate ", "")
+            .replace("famed ", "")
+            .replace("superior ", "")
+            .replace("poor ", "")
+            .replace("broken ", "")
+            .replace("common ", "")
+            .replace(Regex("\\s*\\([^)]*\\)"), "")
+            .replace("'", "")
+            .replace(" ", "-")
+            .replace(Regex("[^a-z0-9-]"), "")
+    }
+    private fun estimateQualityRange(
+        item: ParsedItem,
+        base: CodexItem
+    ): String {
+
+        val attack = item.stats["att"] ?: return "???"
+        val baseAttack = base.stats["attack"] ?: return "???"
+
+        Log.d("QUALITY", "ocrAttack=$attack")
+        Log.d("QUALITY", "baseAttack=$baseAttack")
+
+        var foundMin: Int? = null
+        var foundMax: Int? = null
+
+        for (q in 70..200) {
+
+            val calculated =
+                kotlin.math.ceil(baseAttack * (q / 100.0)).toInt()
+
+            if (calculated == attack) {
+
+                if (foundMin == null)
+                    foundMin = q
+
+                foundMax = q
+            }
+        }
+
+        Log.d("QUALITY", "foundMin=$foundMin foundMax=$foundMax")
+
+        if (foundMin == null || foundMax == null)
+            return "???"
+
+        return if (foundMin == foundMax)
+            "$foundMin%"
+        else
+            "$foundMin-$foundMax%"
+    }
+
+    private fun updateAssessOverlay(
+        itemName: String,
+        qualityRange: String
+    ) {
+
+        AssessState.lastOverlay =
+            "$itemName\n$qualityRange"
+
+        AssessState.lastUpdate =
+            System.currentTimeMillis()
+
+        AssessState.visible = true
+
+        AuraNotifier.refresh?.invoke()
     }
 
     private fun parseRewards(text: String) {

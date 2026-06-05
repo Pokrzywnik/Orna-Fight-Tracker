@@ -11,12 +11,19 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageView
+import android.widget.TextView
+import android.os.Handler
+import android.os.Looper
 
 class FloatingTrackerService : Service() {
 
     private lateinit var windowManager: WindowManager
     private lateinit var floatingView: View
     private lateinit var params: WindowManager.LayoutParams
+    private lateinit var assessView: View
+    private lateinit var assessText: TextView
+
+    private val overlayHandler = Handler(Looper.getMainLooper())
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         stopSelf()
@@ -52,6 +59,109 @@ class FloatingTrackerService : Service() {
         windowManager.addView(floatingView, params)
 
         setupButton(button)
+        createAssessOverlay()
+    }
+
+    private fun createAssessOverlay() {
+
+        assessView = LayoutInflater.from(this)
+            .inflate(R.layout.floating_assess, null)
+
+        assessText =
+            assessView.findViewById(R.id.assessText)
+
+        val assessParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            else
+                WindowManager.LayoutParams.TYPE_PHONE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        )
+
+        assessParams.gravity = Gravity.TOP or Gravity.START
+        assessParams.x = 220
+        assessParams.y = 300
+
+        windowManager.addView(
+            assessView,
+            assessParams
+        )
+
+        assessView.setOnTouchListener(object : View.OnTouchListener {
+
+            var initialX = 0
+            var initialY = 0
+
+            var touchX = 0f
+            var touchY = 0f
+
+            override fun onTouch(
+                v: View,
+                event: MotionEvent
+            ): Boolean {
+
+                when (event.action) {
+
+                    MotionEvent.ACTION_DOWN -> {
+
+                        initialX = assessParams.x
+                        initialY = assessParams.y
+
+                        touchX = event.rawX
+                        touchY = event.rawY
+
+                        return true
+                    }
+
+                    MotionEvent.ACTION_MOVE -> {
+
+                        assessParams.x =
+                            initialX + (event.rawX - touchX).toInt()
+
+                        assessParams.y =
+                            initialY + (event.rawY - touchY).toInt()
+
+                        windowManager.updateViewLayout(
+                            assessView,
+                            assessParams
+                        )
+
+                        return true
+                    }
+                }
+
+                return false
+            }
+        })
+
+        overlayHandler.post(object : Runnable {
+
+            override fun run() {
+
+                if (
+                    System.currentTimeMillis() -
+                    AssessState.lastUpdate > 5000
+                ) {
+
+                    assessView.visibility = View.GONE
+
+                } else {
+
+                    assessView.visibility = View.VISIBLE
+
+                    assessText.text =
+                        AssessState.lastOverlay
+                }
+
+                overlayHandler.postDelayed(
+                    this,
+                    500
+                )
+            }
+        })
     }
 
     private fun setupButton(button: ImageView) {
@@ -148,6 +258,10 @@ class FloatingTrackerService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         windowManager.removeView(floatingView)
+
+        if (::assessView.isInitialized) {
+            windowManager.removeView(assessView)
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
