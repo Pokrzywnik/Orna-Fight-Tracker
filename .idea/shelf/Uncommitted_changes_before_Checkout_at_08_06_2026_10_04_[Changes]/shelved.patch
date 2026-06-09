@@ -1,0 +1,133 @@
+Index: app/src/main/java/com/frodo/fighttracker/AssessParser.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.frodo.fighttracker\r\n\r\nimport android.util.Log\r\n\r\ndata class ParsedItem(\r\n    val name: String,\r\n    val quality: String?,\r\n    val level: Int?,\r\n    val stats: Map<String, Int>\r\n)\r\nobject AssessParser {\r\n\r\n    private val qualityList = listOf(\r\n        \"broken\", \"poor\", \"normal\",\r\n        \"superior\", \"famed\", \"legendary\", \"ornate\"\r\n    )\r\n\r\n    fun parse(raw: String): ParsedItem? {\r\n\r\n\r\n        val lines = raw.lines().map { it.trim() }\r\n        if (lines.isEmpty()) return null\r\n\r\n        val name = lines.firstOrNull { it.isNotBlank() } ?: return null\r\n\r\n        val quality = qualityList.firstOrNull {\r\n            raw.contains(it, ignoreCase = true)\r\n        }\r\n\r\n        val level = Regex(\"level\\\\s*(\\\\d+)\", RegexOption.IGNORE_CASE)\r\n            .find(raw)?.groupValues?.getOrNull(1)?.toIntOrNull()\r\n\r\n        val stats = mutableMapOf<String, Int>()\r\n\r\n        val regex = Regex(\r\n            \"(mana|att|mag|dex|def|res|ward|crit|foresight)\\\\s*[:]?\\\\s*(-?\\\\d+)\",\r\n            RegexOption.IGNORE_CASE\r\n        )\r\n\r\n        regex.findAll(raw).forEach {\r\n            val key = it.groupValues[1].lowercase()\r\n            val value = it.groupValues[2].toIntOrNull() ?: 0\r\n            stats[key] = value\r\n        }\r\n        Log.d(\r\n            \"ASSESS_PARSE\",\r\n            \"name=$name quality=$quality stats=$stats\"\r\n        )\r\n        return ParsedItem(name, quality, level, stats)\r\n    }\r\n}
+===================================================================
+diff --git a/app/src/main/java/com/frodo/fighttracker/AssessParser.kt b/app/src/main/java/com/frodo/fighttracker/AssessParser.kt
+--- a/app/src/main/java/com/frodo/fighttracker/AssessParser.kt	(revision 3719ca742fb248322c2effc9d1652f778c2d48a7)
++++ b/app/src/main/java/com/frodo/fighttracker/AssessParser.kt	(date 1780669925045)
+@@ -5,9 +5,10 @@
+ data class ParsedItem(
+     val name: String,
+     val quality: String?,
+-    val level: Int?,
++    val level: Int = 1,
+     val stats: Map<String, Int>
+ )
++
+ object AssessParser {
+ 
+     private val qualityList = listOf(
+@@ -15,37 +16,105 @@
+         "superior", "famed", "legendary", "ornate"
+     )
+ 
++    private val ignoredContains = listOf(
++        "victory",
++        "experience",
++        "party",
++        "equip place",
++        "drop",
++        "acquired",
++        "category",
++        "slots",
++        "materials",
++        "useable by",
++        "rename",
++        "max:",
++        "appraiser",
++        "open equipment",
++        "send to storage",
++        "unlock",
++        "dismantle",
++        "whestone",
++        "whhetstone",
++        "weapon",
++        "armor",
++        "accessory",
++        "tier"
++    )
++
+     fun parse(raw: String): ParsedItem? {
++        val lines = raw.lines()
++            .map { it.trim() }
++            .filter { it.isNotBlank() }
+ 
+-
+-        val lines = raw.lines().map { it.trim() }
+         if (lines.isEmpty()) return null
+ 
+-        val name = lines.firstOrNull { it.isNotBlank() } ?: return null
++        val name = pickItemName(lines) ?: return null
+ 
+         val quality = qualityList.firstOrNull {
+             raw.contains(it, ignoreCase = true)
+         }
+ 
+         val level = Regex("level\\s*(\\d+)", RegexOption.IGNORE_CASE)
+-            .find(raw)?.groupValues?.getOrNull(1)?.toIntOrNull()
++            .find(raw)
++            ?.groupValues
++            ?.getOrNull(1)
++            ?.toIntOrNull()
++            ?: 1
+ 
+         val stats = mutableMapOf<String, Int>()
+ 
+         val regex = Regex(
+-            "(mana|att|mag|dex|def|res|ward|crit|foresight)\\s*[:]?\\s*(-?\\d+)",
++            "(mana|att|mag|dex|def|res|ward|crit|foresight)\\s*[:]?\\s*([0-9oOIl]+)",
+             RegexOption.IGNORE_CASE
+         )
+ 
+         regex.findAll(raw).forEach {
+             val key = it.groupValues[1].lowercase()
+-            val value = it.groupValues[2].toIntOrNull() ?: 0
++            val value = parseOcrNumber(it.groupValues[2])
+             stats[key] = value
+         }
++
+         Log.d(
+             "ASSESS_PARSE",
+             "name=$name quality=$quality stats=$stats"
+         )
++
+         return ParsedItem(name, quality, level, stats)
+     }
++
++    private fun parseOcrNumber(raw: String): Int {
++        return raw
++            .trim()
++            .replace('o', '0')
++            .replace('O', '0')
++            .replace('l', '1')
++            .replace('I', '1')
++            .filter { it.isDigit() }
++            .toIntOrNull() ?: 0
++    }
++
++    private fun pickItemName(lines: List<String>): String? {
++        return lines.firstOrNull { isLikelyItemName(it) }
++    }
++
++    private fun isLikelyItemName(line: String): Boolean {
++        val lower = line.lowercase()
++
++        if (ignoredContains.any { lower.contains(it) }) return false
++        if (lower == "o000o0") return false
++        if (lower.matches(Regex("^[o0]+$"))) return false
++        if (line.contains(".") || line.contains(",") || line.contains(":")) return false
++        if (line.length > 60) return false
++
++        val letters = line.count { it.isLetter() }
++        val digits = line.count { it.isDigit() }
++        val wordCount = line.split(Regex("\\s+")).size
++
++        if (letters < 3) return false
++        if (digits > letters) return false
++        if (wordCount > 8) return false
++
++        return true
++    }
+ }
+\ No newline at end of file

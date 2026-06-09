@@ -1,0 +1,124 @@
+Index: app/src/main/java/com/frodo/fighttracker/FightTrackerService.kt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.frodo.fighttracker\r\n\r\nimport android.app.Notification\r\nimport android.app.NotificationChannel\r\nimport android.app.NotificationManager\r\nimport android.app.PendingIntent\r\nimport android.app.Service\r\nimport android.content.Intent\r\nimport android.graphics.Bitmap\r\nimport android.graphics.PixelFormat\r\nimport android.hardware.display.DisplayManager\r\nimport android.hardware.display.VirtualDisplay\r\nimport android.media.Image\r\nimport android.media.ImageReader\r\nimport android.media.projection.MediaProjection\r\nimport android.media.projection.MediaProjectionManager\r\nimport android.os.Build\r\nimport android.os.Handler\r\nimport android.os.IBinder\r\nimport android.os.Looper\r\nimport android.util.Log\r\nimport androidx.core.app.NotificationCompat\r\nimport com.google.mlkit.vision.common.InputImage\r\nimport com.google.mlkit.vision.text.TextRecognition\r\nimport com.google.mlkit.vision.text.latin.TextRecognizerOptions\r\nimport java.nio.ByteBuffer\r\n\r\n\r\n\r\nclass FightTrackerService : Service() {\r\n\r\n    companion object {\r\n        const val CHANNEL_ID = \"fight_tracker_channel\"\r\n        var startTime = 0L\r\n    }\r\n\r\n    private var totalGold = 0L\r\n    private var totalOrns = 0L\r\n    private var totalExp = 0L\r\n    private var totalShards = 0L\r\n\r\n    private var lastShards = -1L\r\n    private var lastGold = -1L\r\n    private var lastOrns = -1L\r\n    private var lastExp = -1L\r\n\r\n\r\n    private var mediaProjection: MediaProjection? = null\r\n    private var virtualDisplay: VirtualDisplay? = null\r\n    private var imageReader: ImageReader? = null\r\n\r\n    private val handler = Handler(Looper.getMainLooper())\r\n\r\n    private val recognizer =\r\n        TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)\r\n\r\n    override fun onStartCommand(\r\n        intent: Intent?,\r\n        flags: Int,\r\n        startId: Int\r\n    ): Int {\r\n\r\n        createNotificationChannel()\r\n\r\n        val stopIntent = Intent(this, FightTrackerService::class.java)\r\n        stopIntent.action = \"STOP\"\r\n\r\n        val stopPendingIntent =\r\n            PendingIntent.getService(\r\n                this,\r\n                1,\r\n                stopIntent,\r\n                PendingIntent.FLAG_IMMUTABLE\r\n            )\r\n\r\n        val notification: Notification =\r\n            NotificationCompat.Builder(this, CHANNEL_ID)\r\n                .setContentTitle(\"Fight Tracker Running\")\r\n                .setContentText(\"Tracking rewards...\")\r\n                .setSmallIcon(android.R.drawable.ic_media_play)\r\n                .addAction(\r\n                    android.R.drawable.ic_media_pause,\r\n                    \"STOP\",\r\n                    stopPendingIntent\r\n                )\r\n                .build()\r\n\r\n        startForeground(1, notification)\r\n\r\n        if (intent?.action == \"STOP\") {\r\n            stopSelf()\r\n            return START_NOT_STICKY\r\n        }\r\n\r\n        val resultCode =\r\n            intent?.getIntExtra(\"resultCode\", -1) ?: -1\r\n\r\n        val data =\r\n            intent?.getParcelableExtra<Intent>(\"data\")\r\n\r\n        val projectionManager =\r\n            getSystemService(\r\n                MEDIA_PROJECTION_SERVICE\r\n            ) as MediaProjectionManager\r\n\r\n        mediaProjection =\r\n            projectionManager.getMediaProjection(resultCode, data!!)\r\n\r\n        mediaProjection?.registerCallback(\r\n            object : MediaProjection.Callback() {\r\n                override fun onStop() {\r\n                    stopSelf()\r\n                }\r\n            },\r\n            Handler(Looper.getMainLooper())\r\n        )\r\n        startTime = System.currentTimeMillis()\r\n        startCapture()\r\n\r\n        return START_STICKY\r\n    }\r\n\r\n    private fun startCapture() {\r\n        val interval = SettingsStore.getScanInterval(this@FightTrackerService)\r\n\r\n        val metrics = resources.displayMetrics\r\n\r\n        imageReader =\r\n            ImageReader.newInstance(\r\n                metrics.widthPixels,\r\n                metrics.heightPixels,\r\n                PixelFormat.RGBA_8888,\r\n                2\r\n            )\r\n\r\n        virtualDisplay =\r\n            mediaProjection?.createVirtualDisplay(\r\n                \"FightTracker\",\r\n                metrics.widthPixels,\r\n                metrics.heightPixels,\r\n                metrics.densityDpi,\r\n                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,\r\n                imageReader?.surface,\r\n                null,\r\n                null\r\n            )\r\n\r\n        handler.postDelayed(object : Runnable {\r\n\r\n            override fun run() {\r\n\r\n                scanScreen()\r\n\r\n                handler.postDelayed(this, interval)\r\n            }\r\n\r\n        }, interval)\r\n    }\r\n\r\n    private fun removeIconsAndEnhance(src: Bitmap): Bitmap {\r\n\r\n        val width = src.width\r\n        val height = src.height\r\n\r\n        val out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)\r\n\r\n        for (x in 0 until width) {\r\n            for (y in 0 until height) {\r\n\r\n                val pixel = src.getPixel(x, y)\r\n\r\n                val r = (pixel shr 16) and 0xff\r\n                val g = (pixel shr 8) and 0xff\r\n                val b = pixel and 0xff\r\n\r\n                //  keep only near-white pixels\r\n                val isWhite =\r\n                    r > 170 && g > 170 && b > 170\r\n\r\n                val isPureWhite =\r\n                    r > 245 &&\r\n                    g > 245 &&\r\n                    b > 245\r\n\r\n                if (isWhite) {\r\n                    out.setPixel(x, y, android.graphics.Color.WHITE)\r\n                } else {\r\n                    out.setPixel(x, y, android.graphics.Color.BLACK)\r\n                }\r\n            }\r\n        }\r\n\r\n        return out\r\n    }\r\n\r\n    private fun scanScreen() {\r\n\r\n        val image: Image =\r\n            imageReader?.acquireLatestImage() ?: return\r\n\r\n        val plane = image.planes[0]\r\n\r\n        val buffer: ByteBuffer = plane.buffer\r\n\r\n        val pixelStride = plane.pixelStride\r\n        val rowStride = plane.rowStride\r\n        val rowPadding =\r\n            rowStride - pixelStride * image.width\r\n\r\n        val fullBitmap =\r\n            Bitmap.createBitmap(\r\n                image.width + rowPadding / pixelStride,\r\n                image.height,\r\n                Bitmap.Config.ARGB_8888\r\n            )\r\n\r\n        fullBitmap.copyPixelsFromBuffer(buffer)\r\n\r\n        //  crop only reward region (bottom + right side)\r\n        val croppedBitmap = Bitmap.createBitmap(\r\n            fullBitmap,\r\n            (fullBitmap.width * 0.25).toInt(),   // skip left icons completely\r\n            (fullBitmap.height * 0.35).toInt(),  // skip fight log\r\n            (fullBitmap.width * 0.75).toInt(),   // keep right side\r\n            (fullBitmap.height * 0.65).toInt()   // reward block\r\n        )\r\n\r\n        image.close()\r\n\r\n\r\n        val scaledBitmap = Bitmap.createScaledBitmap(\r\n            croppedBitmap,\r\n            croppedBitmap.width / 2,\r\n            croppedBitmap.height / 2,\r\n            false\r\n        )\r\n\r\n        val cleanedBitmap = removeIconsAndEnhance(scaledBitmap)\r\n\r\n        val inputImage =\r\n            InputImage.fromBitmap(cleanedBitmap, 0)\r\n\r\n\r\n\r\n        Log.d(\r\n            \"OCR_BITMAP\",\r\n            \"Processed bitmap: ${cleanedBitmap.width}x${cleanedBitmap.height}\"\r\n        )\r\n\r\n\r\n        runAssessOCR(fullBitmap)\r\n\r\n\r\n        recognizer.process(inputImage)\r\n            .addOnSuccessListener { visionText ->\r\n\r\n                Log.d(\"OCR_RAW\", \"================ OCR FRAME ================\")\r\n                Log.d(\"OCR_RAW\", visionText.text)\r\n\r\n                val text = visionText.text.lowercase()\r\n\r\n                if (\r\n                    text.contains(\"victory\") ||\r\n                    text.contains(\"experience\") ||\r\n                    text.contains(\"party\") ||\r\n                    text.contains(\"orns\") ||\r\n                    text.contains(\"gold\") ||\r\n                    text.contains(\"here's what you found\") ||\r\n                    text.contains(\"heres what you found\") ||\r\n                    text.contains(\"DEFEATED\") ||\r\n                    text.contains(\"DUNGEON COMPLETE\") ||\r\n                    text.contains(\"COMPLETE\")\r\n                ) {\r\n                    parseRewards(text)\r\n                }\r\n                fullBitmap.recycle()\r\n                croppedBitmap.recycle()\r\n                scaledBitmap.recycle()\r\n                cleanedBitmap.recycle()\r\n            }\r\n            .addOnFailureListener { e ->\r\n                Log.e(\"OCR_RAW\", \"OCR FAILED\", e)\r\n            }\r\n\r\n\r\n    }\r\n\r\n    private fun runAssessOCR(bitmap: Bitmap) {\r\n        Log.d(\"ASSESS\", \"runAssessOCR called\")\r\n        val cropped = Bitmap.createBitmap(\r\n            bitmap,\r\n            (bitmap.width * 0.15).toInt(),\r\n            (bitmap.height * 0.10).toInt(),\r\n            (bitmap.width * 0.70).toInt(),\r\n            (bitmap.height * 0.75).toInt()\r\n        )\r\n\r\n        Log.d(\r\n            \"ASSESS\",\r\n            \"crop=${cropped.width}x${cropped.height}\"\r\n        )\r\n        val input = InputImage.fromBitmap(cropped, 0)\r\n\r\n        recognizer.process(input)\r\n            .addOnSuccessListener { result ->\r\n\r\n                Log.d(\r\n                    \"ASSESS_RAW\",\r\n                    \"================ FULL OCR FRAME ================\"\r\n                )\r\n\r\n                Log.d(\r\n                    \"ASSESS_RAW\",\r\n                    result.text\r\n                )\r\n                val parsed = AssessParser.parse(result.text)\r\n                Log.d(\r\n                    \"ASSESS\",\r\n                    \"parsed=$parsed\"\r\n                )\r\n                parsed?.let { evaluateItem(it) }\r\n\r\n                cropped.recycle()\r\n            }\r\n            .addOnFailureListener {\r\n                cropped.recycle()\r\n            }\r\n    }\r\n\r\n    private fun evaluateItem(item: ParsedItem) {\r\n\r\n        Log.d(\"ASSESS_ITEM\", \"name=${item.name}\")\r\n\r\n        val id = normalize(item.name)\r\n\r\n        Log.d(\"ASSESS_ITEM\", \"normalized=$id\")\r\n\r\n        val base = CodexRepository.get(id)\r\n\r\n        Log.d(\"ASSESS_ITEM\", \"repository result=$base\")\r\n\r\n        if (base == null) {\r\n            Log.d(\"ASSESS_ITEM\", \"ITEM NOT FOUND\")\r\n            return\r\n        }\r\n\r\n        val qualityRange =\r\n            estimateQualityRange(item, base)\r\n\r\n        updateAssessOverlay(\r\n            item.name,\r\n            qualityRange\r\n        )\r\n    }\r\n\r\n    private fun normalize(name: String): String {\r\n\r\n        return name\r\n            .lowercase()\r\n            .replace(\"legendary \", \"\")\r\n            .replace(\"ornate \", \"\")\r\n            .replace(\"famed \", \"\")\r\n            .replace(\"superior \", \"\")\r\n            .replace(\"poor \", \"\")\r\n            .replace(\"broken \", \"\")\r\n            .replace(\"common \", \"\")\r\n            .replace(Regex(\"\\\\s*\\\\([^)]*\\\\)\"), \"\")\r\n            .replace(\"'\", \"\")\r\n            .replace(\" \", \"-\")\r\n            .replace(Regex(\"[^a-z0-9-]\"), \"\")\r\n    }\r\n    private fun estimateQualityRange(\r\n        item: ParsedItem,\r\n        base: CodexItem\r\n    ): String {\r\n\r\n        val attack = item.stats[\"att\"] ?: return \"???\"\r\n        val baseAttack = base.stats[\"attack\"] ?: return \"???\"\r\n\r\n        Log.d(\"QUALITY\", \"ocrAttack=$attack\")\r\n        Log.d(\"QUALITY\", \"baseAttack=$baseAttack\")\r\n\r\n        var foundMin: Int? = null\r\n        var foundMax: Int? = null\r\n\r\n        for (q in 70..200) {\r\n\r\n            val calculated =\r\n                kotlin.math.ceil(baseAttack * (q / 100.0)).toInt()\r\n\r\n            if (calculated == attack) {\r\n\r\n                if (foundMin == null)\r\n                    foundMin = q\r\n\r\n                foundMax = q\r\n            }\r\n        }\r\n\r\n        Log.d(\"QUALITY\", \"foundMin=$foundMin foundMax=$foundMax\")\r\n\r\n        if (foundMin == null || foundMax == null)\r\n            return \"???\"\r\n\r\n        return if (foundMin == foundMax)\r\n            \"$foundMin%\"\r\n        else\r\n            \"$foundMin-$foundMax%\"\r\n    }\r\n\r\n    private fun updateAssessOverlay(\r\n        itemName: String,\r\n        qualityRange: String\r\n    ) {\r\n\r\n        AssessState.lastOverlay =\r\n            \"$itemName\\n$qualityRange\"\r\n\r\n        AssessState.lastUpdate =\r\n            System.currentTimeMillis()\r\n\r\n        AssessState.visible = true\r\n\r\n        AuraNotifier.refresh?.invoke()\r\n    }\r\n\r\n    private fun parseRewards(text: String) {\r\n\r\n        val lines = text.lines()\r\n\r\n        var sessionGold = 0L\r\n        var sessionOrns = 0L\r\n        var sessionExp = 0L\r\n        var sessionShards = 0L\r\n\r\n        for (line in lines) {\r\n\r\n            val clean = line.replace(\",\", \"\").lowercase()\r\n\r\n\r\n            if (\r\n                clean.contains(\"tower shard\") ||\r\n                clean.contains(\"tower shards\")\r\n            ) {\r\n                sessionShards += extractNumber(clean)\r\n            }\r\n\r\n            if (clean.contains(\"gold\") && !clean.contains(\"kingdom\")) {\r\n                sessionGold += extractNumber(clean)\r\n            }\r\n\r\n            if (clean.contains(\"orns\")) {\r\n                sessionOrns += extractNumber(clean)\r\n            }\r\n\r\n            if (clean.contains(\"experience\") || clean.contains(\"party xp\")) {\r\n                sessionExp += extractNumber(clean)\r\n            }\r\n        }\r\n\r\n        // duplicate check\r\n        if (\r\n            sessionGold == lastGold &&\r\n            sessionOrns == lastOrns &&\r\n            sessionExp == lastExp &&\r\n            sessionShards == lastShards\r\n        ) {\r\n            return\r\n        }\r\n\r\n        // store last seen values\r\n        lastGold = sessionGold\r\n        lastOrns = sessionOrns\r\n        lastExp = sessionExp\r\n        lastShards = sessionShards\r\n\r\n        // add ONLY new results\r\n        totalGold += sessionGold\r\n        totalOrns += sessionOrns\r\n        totalExp += sessionExp\r\n        totalShards += sessionShards\r\n\r\n        FightState.gold = totalGold\r\n        FightState.orns = totalOrns\r\n        FightState.exp = totalExp\r\n        FightState.shards = totalShards\r\n\r\n        android.util.Log.d(\r\n            \"FIGHT_TOTALS\",\r\n            \"STATE UPDATE -> EXP=$totalExp GOLD=$totalGold ORNS=$totalOrns SHARDS=$totalShards\"\r\n        )\r\n    }\r\n\r\n    private fun extractNumber(text: String): Long {\r\n\r\n        // keep digits only\r\n        val digits = text.filter { it.isDigit() }\r\n\r\n        return digits.toLongOrNull() ?: 0L\r\n    }\r\n\r\n    override fun onDestroy() {\r\n\r\n        virtualDisplay?.release()\r\n        imageReader?.close()\r\n        mediaProjection?.stop()\r\n\r\n        super.onDestroy()\r\n    }\r\n\r\n    override fun onBind(intent: Intent?): IBinder? = null\r\n\r\n    private fun createNotificationChannel() {\r\n\r\n        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {\r\n\r\n            val channel =\r\n                NotificationChannel(\r\n                    CHANNEL_ID,\r\n                    \"Fight Tracker\",\r\n                    NotificationManager.IMPORTANCE_LOW\r\n                )\r\n\r\n            val manager =\r\n                getSystemService(NotificationManager::class.java)\r\n\r\n            manager.createNotificationChannel(channel)\r\n        }\r\n    }\r\n}
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app/src/main/java/com/frodo/fighttracker/FightTrackerService.kt b/app/src/main/java/com/frodo/fighttracker/FightTrackerService.kt
+--- a/app/src/main/java/com/frodo/fighttracker/FightTrackerService.kt	(revision 3719ca742fb248322c2effc9d1652f778c2d48a7)
++++ b/app/src/main/java/com/frodo/fighttracker/FightTrackerService.kt	(date 1780670373022)
+@@ -364,6 +364,12 @@
+             .replace("poor ", "")
+             .replace("broken ", "")
+             .replace("common ", "")
++            .replace("Godforged ", "")
++            .replace("Demonforged ", "")
++            .replace("Masterforged ", "")
++            .replace("godforged ", "")
++            .replace("masterforged ", "")
++            .replace("demonforged ", "")
+             .replace(Regex("\\s*\\([^)]*\\)"), "")
+             .replace("'", "")
+             .replace(" ", "-")
+@@ -374,39 +380,85 @@
+         base: CodexItem
+     ): String {
+ 
+-        val attack = item.stats["att"] ?: return "???"
+-        val baseAttack = base.stats["attack"] ?: return "???"
++        val aliases = mapOf(
++            "att" to "attack",
++            "atk" to "attack",
++            "mag" to "magic",
++            "def" to "defense",
++            "res" to "resistance",
++            "dex" to "dexterity",
++            "mana" to "mana",
++            "hp" to "hp",
++            "ward" to "ward",
++            "foresight" to "foresight",
++            "crit" to "crit",
++            "summon pacts" to "summon_pacts",
++            "summon_pacts" to "summon_pacts"
++        )
++
++        val ignoredStats = setOf(
++            "crit",
++            "adornment_slots",
++            "summon_pacts"
++        )
+ 
+-        Log.d("QUALITY", "ocrAttack=$attack")
+-        Log.d("QUALITY", "baseAttack=$baseAttack")
++        val level = item.level.coerceAtLeast(1)
++
++        val actualStats = item.stats.mapNotNull { (ocrKey, value) ->
++            val key = aliases[ocrKey.lowercase()] ?: ocrKey.lowercase()
++            if (key in ignoredStats) return@mapNotNull null
++            key to value
++        }.toMap()
++
++        if (actualStats.isEmpty()) return "???"
+ 
+         var foundMin: Int? = null
+         var foundMax: Int? = null
+ 
+         for (q in 70..200) {
+-
+-            val calculated =
+-                kotlin.math.ceil(baseAttack * (q / 100.0)).toInt()
++            val quality = q / 100.0
+ 
+-            if (calculated == attack) {
++            val allMatch = actualStats.all { (statName, actualValue) ->
++                val baseValue = base.stats[statName] ?: return@all false
++                val expected = expectedStat(baseValue, level, quality, statName)
++                expected == actualValue
++            }
+ 
+-                if (foundMin == null)
+-                    foundMin = q
+-
++            if (allMatch) {
++                if (foundMin == null) foundMin = q
+                 foundMax = q
+             }
+         }
+ 
++        Log.d("QUALITY", "itemStats=$actualStats")
++        Log.d("QUALITY", "baseStats=${
++            base.stats
++        }")
+         Log.d("QUALITY", "foundMin=$foundMin foundMax=$foundMax")
+ 
+-        if (foundMin == null || foundMax == null)
+-            return "???"
++        if (foundMin == null || foundMax == null) return "???"
+ 
+-        return if (foundMin == foundMax)
++        return if (foundMin == foundMax) {
+             "$foundMin%"
+-        else
++        } else {
+             "$foundMin-$foundMax%"
++        }
+     }
++
++    private fun expectedStat(
++        baseStat: Int,
++        level: Int,
++        quality: Double,
++        statName: String
++    ): Int {
++        if (baseStat <= 0) return 0
++
++        val statDelta = kotlin.math.ceil(baseStat / 10.0)
++        val levelScaling = if (level <= 1) 0.0 else level * statDelta
++        val scaledBaseStat = baseStat + levelScaling
++
++        return kotlin.math.ceil(scaledBaseStat * quality).toInt()
++    }
+ 
+     private fun updateAssessOverlay(
+         itemName: String,

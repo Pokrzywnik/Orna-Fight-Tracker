@@ -311,7 +311,7 @@ class FightTrackerService : Service() {
                 sessionOrns += extractNumber(clean)
             }
 
-            if (clean.contains("experience") || clean.contains("party xp")) {
+            if (clean.contains("XP") || clean.contains("party xp")) {
                 sessionExp += extractNumber(clean)
             }
         }
