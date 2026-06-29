@@ -219,9 +219,9 @@ class FightTrackerService : Service() {
         //  crop only reward region (bottom + right side)
         val croppedBitmap = Bitmap.createBitmap(
             fullBitmap,
-            (fullBitmap.width * 0.25).toInt(),   // skip left icons completely
+            (fullBitmap.width * 0.22).toInt(),   // skip left icons completely
             (fullBitmap.height * 0.35).toInt(),  // skip fight log
-            (fullBitmap.width * 0.75).toInt(),   // keep right side
+            (fullBitmap.width * 0.78).toInt(),   // keep right side
             (fullBitmap.height * 0.65).toInt()   // reward block
         )
 
@@ -260,6 +260,7 @@ class FightTrackerService : Service() {
 
                 if (
                     text.contains("victory") ||
+                    text.contains("VITORIA") ||
                     text.contains("experience") ||
                     text.contains("party") ||
                     text.contains("orns") ||
@@ -268,6 +269,11 @@ class FightTrackerService : Service() {
                     text.contains("heres what you found") ||
                     text.contains("DEFEATED") ||
                     text.contains("DUNGEON COMPLETE") ||
+                    text.contains("BOSS DEFEATED") ||
+                    text.contains("Aqui está o que") ||
+                    text.contains("Aqui está") ||
+                    text.contains("ZWYCIĘSTWO") ||
+                    text.contains("Otrzymano") ||
                     text.contains("COMPLETE")
                 ) {
                     parseRewards(text)
@@ -297,21 +303,27 @@ class FightTrackerService : Service() {
 
 
             if (
-                clean.contains("tower shard") ||
-                clean.contains("tower shards")
+                clean.contains("tower shard") || clean.contains("tower shards") ||                                                //english
+                clean.contains("Fragmentos da Torre") ||                                                                                //portuguese
+                clean.contains("fragmenty wież") || clean.contains("fragmenty wieź") || clean.contains("fragmenty wiez")    //polish
             ) {
                 sessionShards += extractNumber(clean)
             }
 
-            if (clean.contains("gold") && !clean.contains("kingdom")) {
+            if ((clean.contains("gold") && !clean.contains("kingdom")) ||       //english
+                (clean.contains("ouro") && !clean.contains("reino")) ||         //portuguese
+                ((clean.contains("zlota") || clean.contains("złota") || (clean.contains("złtota")))  && !clean.contains("królestwa"))) {    //polish
                 sessionGold += extractNumber(clean)
             }
 
-            if (clean.contains("orns")) {
+            if (clean.contains("orns") ||                                      //english+portuguese
+                clean.contains("ornów") || clean.contains("orndw") || clean.contains("ornỐW") || clean.contains("orn")) {   //polish
                 sessionOrns += extractNumber(clean)
             }
 
-            if (clean.contains("XP") || clean.contains("party xp")) {
+            if (clean.contains("XP") || clean.contains("party xp") ||                                                                    //english
+                clean.contains("doświadczenia") || clean.contains("doświadczenia drużynowego") ||  clean.contains("drużynowego")    //polish
+            ) {
                 sessionExp += extractNumber(clean)
             }
         }
@@ -375,7 +387,7 @@ class FightTrackerService : Service() {
             val channel =
                 NotificationChannel(
                     CHANNEL_ID,
-                    "Fight Tracker",
+                    "Materials Forecast",
                     NotificationManager.IMPORTANCE_LOW
                 )
 

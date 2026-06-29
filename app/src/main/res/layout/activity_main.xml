@@ -45,7 +45,7 @@
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
         android:src="@android:drawable/ic_menu_manage"
-        android:translationY="-120dp" />
+        android:translationY="-142dp" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fabFloatingToggle"
@@ -54,5 +54,5 @@
         android:layout_gravity="bottom|start"
         android:layout_margin="16dp"
         android:src="@android:drawable/ic_media_play"
-        android:translationY="-208dp" />
+        android:translationY="-230dp" />
 </LinearLayout>

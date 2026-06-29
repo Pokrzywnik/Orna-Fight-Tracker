@@ -29,6 +29,7 @@ object RunStorage {
         val obj = JSONObject()
 
         obj.put("runid", run.runid)
+        obj.put("name", run.name)
         obj.put("date", run.date)
         obj.put("duration", run.duration)
         obj.put("gold", run.gold)
@@ -79,12 +80,41 @@ object RunStorage {
                     obj.getLong("gold"),
                     obj.getLong("orns"),
                     obj.getLong("exp"),
-                    obj.optLong("shards", 0L)
+                    obj.optLong("shards", 0L),
+                    obj.optString("name", "")
                 )
             )
         }
 
         return list.reversed()
+    }
+
+    fun renameRun(
+        context: Context,
+        runid: String,
+        newName: String
+    ) {
+
+        val prefs = context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+
+        val array = JSONArray(
+            prefs.getString(KEY, "[]")
+        )
+
+        for (i in 0 until array.length()) {
+
+            val obj = array.getJSONObject(i)
+
+            if (obj.getString("runid") == runid) {
+
+                obj.put("name", newName)
+                break
+            }
+        }
+
+        prefs.edit()
+            .putString(KEY, array.toString())
+            .apply()
     }
 
     fun deleteRun(context: Context, runid: String) {

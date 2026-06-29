@@ -11,6 +11,9 @@ import com.frodo.fighttracker.databinding.FragmentTrackerBinding
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import android.view.Gravity
+import android.widget.LinearLayout
+import android.widget.TextView
 
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -198,30 +201,70 @@ class TrackerFragment : Fragment() {
                 .reversed()
 
             // run header (date + duration)
-            val header = android.widget.LinearLayout(requireContext()).apply {
-                orientation = android.widget.LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.CENTER_VERTICAL
+            val header = LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
                 setPadding(0, 0, 0, 16)
             }
 
-            val dateText = android.widget.TextView(requireContext()).apply {
+            val dateText = TextView(requireContext()).apply {
                 text = run.date
                 textSize = 14f
-                setTextColor(android.graphics.Color.DKGRAY)
-                layoutParams = android.widget.LinearLayout.LayoutParams(
+
+                setTextColor(
+                    com.google.android.material.color.MaterialColors.getColor(
+                        context,
+                        com.google.android.material.R.attr.colorOnSurface,
+                        android.graphics.Color.WHITE
+                    )
+                )
+
+                layoutParams = LinearLayout.LayoutParams(
                     0,
-                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
                     1f
                 )
             }
 
-            val durationText = android.widget.TextView(requireContext()).apply {
+            val nameText = TextView(requireContext()).apply {
+
+                text = if (run.name.isBlank()) "" else run.name
+
+                textSize = 20f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+
+                textAlignment = View.TEXT_ALIGNMENT_CENTER
+
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f
+                )
+            }
+
+            val durationText = TextView(requireContext()).apply {
                 text = run.duration
                 textSize = 14f
-                setTextColor(android.graphics.Color.DKGRAY)
+
+                setTextColor(
+                    com.google.android.material.color.MaterialColors.getColor(
+                        context,
+                        com.google.android.material.R.attr.colorOnSurface,
+                        android.graphics.Color.WHITE
+                    )
+                )
+
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f
+                )
+
+                textAlignment = View.TEXT_ALIGNMENT_TEXT_END
             }
 
             header.addView(dateText)
+            header.addView(nameText)
             header.addView(durationText)
 
             // delete run button
@@ -230,6 +273,11 @@ class TrackerFragment : Fragment() {
                 setTextColor(android.graphics.Color.RED)
                 visibility = View.GONE
                 setPadding(0, 16, 0, 0)
+
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                )
             }
 
             deleteBtn.setOnClickListener {
@@ -238,9 +286,58 @@ class TrackerFragment : Fragment() {
                 renderHistory()
             }
 
+            val renameBtn = android.widget.TextView(requireContext()).apply {
+
+                text = "Rename"
+
+                setTextColor(
+                    com.google.android.material.color.MaterialColors.getColor(
+                        context,
+                        com.google.android.material.R.attr.colorPrimary,
+                        android.graphics.Color.GREEN
+                    )
+                )
+
+                visibility = View.GONE
+
+                setPadding(0, 8, 0, 0)
+
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    marginEnd = 32
+                }
+            }
+
+            renameBtn.setOnClickListener {
+
+                val input = android.widget.EditText(requireContext())
+
+                input.setText(run.name)
+
+                android.app.AlertDialog.Builder(requireContext())
+                    .setTitle("Rename Run")
+                    .setView(input)
+                    .setPositiveButton("Save") { _, _ ->
+
+                        RunStorage.renameRun(
+                            requireContext(),
+                            run.runid,
+                            input.text.toString().trim()
+                        )
+
+                        renderHistory()
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+
+
             // long press to show delete
             tile.setOnLongClickListener {
                 deleteBtn.visibility = View.VISIBLE
+                renameBtn.visibility = View.VISIBLE
                 true
             }
 
@@ -258,7 +355,18 @@ class TrackerFragment : Fragment() {
                     )
                 )
             }
-            tile.addView(deleteBtn)
+            val buttonRow = android.widget.LinearLayout(requireContext()).apply {
+
+                orientation = android.widget.LinearLayout.HORIZONTAL
+
+                gravity = android.view.Gravity.START
+
+            }
+
+            buttonRow.addView(renameBtn)
+            buttonRow.addView(deleteBtn)
+
+            tile.addView(buttonRow)
 
             binding.historyContainer.addView(tile)
         }

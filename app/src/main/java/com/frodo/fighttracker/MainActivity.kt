@@ -219,7 +219,8 @@ class MainActivity : AppCompatActivity() {
                 FightState.gold,
                 FightState.orns,
                 FightState.exp,
-                FightState.shards
+                FightState.shards,
+                ""
             )
         )
 
