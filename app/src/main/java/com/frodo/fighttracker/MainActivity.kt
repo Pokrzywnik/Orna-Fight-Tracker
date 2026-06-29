@@ -154,6 +154,7 @@ class MainActivity : AppCompatActivity() {
                 intent.putExtra("data", result.data)
 
                 startForegroundService(intent)
+                startService(Intent(this, OverlayService::class.java))
             }
         }
 
@@ -185,6 +186,8 @@ class MainActivity : AppCompatActivity() {
     fun stopTracking() {
 
         stopService(Intent(this, FightTrackerService::class.java))
+
+        stopService(Intent(this, OverlayService::class.java))
 
         val endTime = System.currentTimeMillis()
 
@@ -588,5 +591,6 @@ class MainActivity : AppCompatActivity() {
 
     fun startFloatingService() {
         startService(Intent(this, FloatingTrackerService::class.java))
+        startService(Intent(this, OverlayService::class.java))
     }
 }
