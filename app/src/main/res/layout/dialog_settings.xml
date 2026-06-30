@@ -16,7 +16,20 @@
         android:inputType="number"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
+		
+	<CheckBox
+    android:id="@+id/highQualityOcrCheck"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="High quality OCR" />
 
+<TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="Disables image downscaling. May reduce performance on low-end devices"
+    android:textSize="12sp"
+    android:textColor="#888888"
+    android:paddingBottom="12dp"/>
     <!-- ========================= -->
     <!-- CODEx + ANGUISH ROW -->
     <!-- ========================= -->

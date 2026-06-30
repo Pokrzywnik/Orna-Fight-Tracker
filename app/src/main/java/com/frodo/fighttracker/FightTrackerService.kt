@@ -164,31 +164,30 @@ class FightTrackerService : Service() {
 
         val out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
 
-        for (x in 0 until width) {
-            for (y in 0 until height) {
+        val pixels = IntArray(width * height)
 
-                val pixel = src.getPixel(x, y)
+        // Read all pixels in one native call
+        src.getPixels(pixels, 0, width, 0, 0, width, height)
 
-                val r = (pixel shr 16) and 0xff
-                val g = (pixel shr 8) and 0xff
-                val b = pixel and 0xff
+        for (i in pixels.indices) {
 
-                //  keep only near-white pixels
-                val isWhite =
-                    r > 170 && g > 170 && b > 170
+            val pixel = pixels[i]
 
-                val isPureWhite =
-                    r > 245 &&
-                    g > 245 &&
-                    b > 245
+            val r = (pixel shr 16) and 0xff
+            val g = (pixel shr 8) and 0xff
+            val b = pixel and 0xff
 
-                if (isWhite) {
-                    out.setPixel(x, y, android.graphics.Color.WHITE)
-                } else {
-                    out.setPixel(x, y, android.graphics.Color.BLACK)
-                }
-            }
+            val brightness = (r + g + b) / 3
+
+            pixels[i] =
+                if (brightness > 150)
+                    android.graphics.Color.WHITE
+                else
+                    android.graphics.Color.BLACK
         }
+
+        // Write all pixels back in one native call
+        out.setPixels(pixels, 0, width, 0, 0, width, height)
 
         return out
     }
@@ -217,21 +216,35 @@ class FightTrackerService : Service() {
         fullBitmap.copyPixelsFromBuffer(buffer)
 
         //  crop only reward region (bottom + right side)
+//        val croppedBitmap = Bitmap.createBitmap(
+//            fullBitmap,
+//            (fullBitmap.width * 0.22).toInt(),   // skip left icons completely
+//            (fullBitmap.height * 0.35).toInt(),  // skip fight log
+//            (fullBitmap.width * 0.56).toInt(),   // keep right side
+//            (fullBitmap.height * 0.45).toInt()   // reward block
+//        )
+
         val croppedBitmap = Bitmap.createBitmap(
             fullBitmap,
-            (fullBitmap.width * 0.22).toInt(),   // skip left icons completely
-            (fullBitmap.height * 0.35).toInt(),  // skip fight log
-            (fullBitmap.width * 0.78).toInt(),   // keep right side
-            (fullBitmap.height * 0.65).toInt()   // reward block
+            (fullBitmap.width * 0.22).toInt(),   // start at 22% width
+            (fullBitmap.height * 0.10).toInt(),  // Starts at 10% height
+            (fullBitmap.width * 0.56).toInt(),   // covers right 56% width
+            (fullBitmap.height * 0.512).toInt()  // Covers down 51,2% height
         )
 
         image.close()
 
 
+        val scaling =
+            if (SettingsStore.getHighQualityOcr(this))
+                1
+            else
+                2
+
         val scaledBitmap = Bitmap.createScaledBitmap(
             croppedBitmap,
-            croppedBitmap.width / 2,
-            croppedBitmap.height / 2,
+            croppedBitmap.width / scaling,
+            croppedBitmap.height / scaling,
             false
         )
 
@@ -261,6 +274,7 @@ class FightTrackerService : Service() {
                 if (
                     text.contains("victory") ||
                     text.contains("VITORIA") ||
+                    text.contains("VÍCTORY!") ||
                     text.contains("experience") ||
                     text.contains("party") ||
                     text.contains("orns") ||
@@ -304,24 +318,24 @@ class FightTrackerService : Service() {
 
             if (
                 clean.contains("tower shard") || clean.contains("tower shards") ||                                                //english
-                clean.contains("Fragmentos da Torre") ||                                                                                //portuguese
+                clean.contains("fragmentos da torre") ||                                                                                //portuguese
                 clean.contains("fragmenty wież") || clean.contains("fragmenty wieź") || clean.contains("fragmenty wiez")    //polish
             ) {
                 sessionShards += extractNumber(clean)
             }
 
             if ((clean.contains("gold") && !clean.contains("kingdom")) ||       //english
-                (clean.contains("ouro") && !clean.contains("reino")) ||         //portuguese
+                ((clean.contains("ouro") || clean.contains("0uro")) && !clean.contains("reino")) ||         //portuguese
                 ((clean.contains("zlota") || clean.contains("złota") || (clean.contains("złtota")))  && !clean.contains("królestwa"))) {    //polish
                 sessionGold += extractNumber(clean)
             }
 
-            if (clean.contains("orns") ||                                      //english+portuguese
+            if (clean.contains("orns") || clean.contains("0rns") ||                                     //english+portuguese
                 clean.contains("ornów") || clean.contains("orndw") || clean.contains("ornỐW") || clean.contains("orn")) {   //polish
                 sessionOrns += extractNumber(clean)
             }
 
-            if (clean.contains("XP") || clean.contains("party xp") ||                                                                    //english
+            if (clean.contains("xp") || clean.contains("party xp") ||                                                                    //english
                 clean.contains("doświadczenia") || clean.contains("doświadczenia drużynowego") ||  clean.contains("drużynowego")    //polish
             ) {
                 sessionExp += extractNumber(clean)

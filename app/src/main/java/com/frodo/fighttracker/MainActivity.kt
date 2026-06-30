@@ -34,6 +34,20 @@ private lateinit var codexFragment: WebFragment
 
 object SettingsStore {
 
+    private const val KEY_HIGH_QUALITY_OCR = "high_quality_ocr"
+
+    fun getHighQualityOcr(context: Context): Boolean {
+        return context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+            .getBoolean(KEY_HIGH_QUALITY_OCR, false)
+    }
+
+    fun setHighQualityOcr(context: Context, value: Boolean) {
+        context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_HIGH_QUALITY_OCR, value)
+            .apply()
+    }
+
     private const val KEY_ANGUISH_VERSION = "anguish_version"
 
     fun getAnguishVersion(context: Context): String {
@@ -53,12 +67,12 @@ object SettingsStore {
 
     fun getMaterialHour(context: Context): Int {
         return context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
-            .getInt(KEY_MATERIAL_HOUR, 7)
+            .getInt(KEY_MATERIAL_HOUR, -1)
     }
 
     fun getMaterialMinute(context: Context): Int {
         return context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
-            .getInt(KEY_MATERIAL_MIN, 0)
+            .getInt(KEY_MATERIAL_MIN, -1)
     }
 
     fun setMaterialTime(context: Context, hour: Int, minute: Int) {
@@ -365,6 +379,7 @@ class MainActivity : AppCompatActivity() {
 
     fun stopFloatingService() {
         stopService(Intent(this, FloatingTrackerService::class.java))
+        stopService(Intent(this, OverlayService::class.java))
     }
 
     fun getCodexUrl(): String {
@@ -426,10 +441,37 @@ class MainActivity : AppCompatActivity() {
 
         val dialogView = layoutInflater.inflate(R.layout.dialog_settings, null)
 
+        val timePicker =
+            dialogView.findViewById<TimePicker>(R.id.materialTimePicker)
+        timePicker.setIs24HourView(true)
+        val savedHour = SettingsStore.getMaterialHour(this)
+        val savedMinute = SettingsStore.getMaterialMinute(this)
+
+        val calendar = java.util.Calendar.getInstance()
+
+        val hour = if (savedHour == -1) calendar.get(java.util.Calendar.HOUR_OF_DAY) else savedHour
+        val minute = if (savedMinute == -1) calendar.get(java.util.Calendar.MINUTE) else savedMinute
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            timePicker.hour = hour
+            timePicker.minute = minute
+        } else {
+            timePicker.currentHour = hour
+            timePicker.currentMinute = minute
+        }
+
         val notifyCheck =
             dialogView.findViewById<android.widget.CheckBox>(
                 R.id.materialNotifyCheck
             )
+
+        val highQualityCheck =
+            dialogView.findViewById<android.widget.CheckBox>(
+                R.id.highQualityOcrCheck
+            )
+
+        highQualityCheck.isChecked =
+            SettingsStore.getHighQualityOcr(this)
 
         notifyCheck.isChecked =
             SettingsStore.getMaterialNotifications(this)
@@ -528,8 +570,7 @@ class MainActivity : AppCompatActivity() {
 
                 SettingsStore.setAnguishVersion(this, anguishVersion)
 
-                val timePicker =
-                    dialogView.findViewById<TimePicker>(R.id.materialTimePicker)
+
 
                 val hour = if (Build.VERSION.SDK_INT >= 23)
                     timePicker.hour
@@ -543,14 +584,17 @@ class MainActivity : AppCompatActivity() {
 
                 SettingsStore.setMaterialTime(this, hour, minute)
 
-                val interval = scanInput.text.toString().toLongOrNull() ?: 2500L
+                val interval = scanInput.text.toString().toLongOrNull() ?: 500L
                 SettingsStore.setScanInterval(this, interval)
 
                 SettingsStore.setMaterialNotifications(
                     this,
                     notifyCheck.isChecked
                 )
-
+                SettingsStore.setHighQualityOcr(
+                    this,
+                    highQualityCheck.isChecked
+                )
                 val oldCodex = SettingsStore.getCodexType(this)
 
                 val selectedCodex = when (codexGroup.checkedRadioButtonId) {

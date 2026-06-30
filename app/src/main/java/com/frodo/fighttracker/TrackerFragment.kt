@@ -21,10 +21,15 @@ import java.util.Locale
 var recording = 0
 
 class TrackerFragment : Fragment() {
-    var start = 0
+
     private var _binding: FragmentTrackerBinding? = null
     private val binding get() = _binding!!
 
+
+    override fun onResume() {
+        super.onResume()
+        renderHistory()
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -75,10 +80,7 @@ class TrackerFragment : Fragment() {
                     }"
 
                 handler.postDelayed(this, 500)
-                if(start==0){
-                    renderHistory()
-                    start = 1
-                }
+
             }
 
         })

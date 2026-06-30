@@ -12,6 +12,7 @@ import android.view.LayoutInflater
 import android.view.WindowManager
 import android.widget.TextView
 import android.util.Log
+import android.view.View
 
 class OverlayService : Service() {
 
@@ -70,8 +71,7 @@ class OverlayService : Service() {
             else
                 WindowManager.LayoutParams.TYPE_PHONE,
 
-            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
 
             PixelFormat.TRANSLUCENT
         )
@@ -86,6 +86,40 @@ class OverlayService : Service() {
         Log.d("OverlayService", "About to add overlay")
         windowManager.addView(overlayView, params)
         Log.d("OverlayService", "Overlay successfully added")
+
+        overlayView.setOnTouchListener(object : View.OnTouchListener {
+
+            private var initialX = 0
+            private var initialY = 0
+            private var touchX = 0f
+            private var touchY = 0f
+
+            override fun onTouch(v: View?, event: android.view.MotionEvent): Boolean {
+
+                when (event.action) {
+
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        initialX = params.x
+                        initialY = params.y
+                        touchX = event.rawX
+                        touchY = event.rawY
+                        return true
+                    }
+
+                    android.view.MotionEvent.ACTION_MOVE -> {
+                        val dx = (event.rawX - touchX).toInt()
+                        val dy = (event.rawY - touchY).toInt()
+
+                        params.x = initialX + dx
+                        params.y = initialY + dy
+
+                        windowManager.updateViewLayout(overlayView, params)
+                        return true
+                    }
+                }
+                return false
+            }
+        })
         handler.post(updater)
     }
 
