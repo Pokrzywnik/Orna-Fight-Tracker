@@ -37,14 +37,21 @@ object MaterialNotifier {
 
         if (selected.isEmpty()) return
 
+        SelectedGuilds.load(context)
+
         val files = listOf(
             "remembrance.csv",
             "coral.csv",
-            "anguish_1_0.csv",
+            when (SettingsStore.getAnguishVersion(context)) {
+                "2.0" -> "anguish_2_0.csv"
+                else -> "anguish_1_0.csv"
+            },
             "sparring.csv",
             "trials.csv",
             "towers.csv"
-        )
+        ).filter {
+            SelectedGuilds.isEnabled(it)
+        }
 
         val todayItems = mutableSetOf<String>()
         val tomorrowItems = mutableSetOf<String>()
