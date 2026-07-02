@@ -30,6 +30,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".FirstRunActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.DeviceDefault.Dialog"/>
+
         <service
             android:name=".FightTrackerService"
             android:exported="false"
@@ -41,6 +46,14 @@
 
         <service
             android:name=".OverlayService"
+            android:exported="false"/>
+
+        <service
+            android:name=".CropOverlayService"
+            android:exported="false"/>
+
+        <service
+            android:name=".OcrDebugOverlayService"
             android:exported="false"/>
 
         <receiver

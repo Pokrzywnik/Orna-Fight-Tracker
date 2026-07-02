@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
+import android.graphics.RectF
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.Image
@@ -73,16 +74,30 @@ class FightTrackerService : Service() {
                 PendingIntent.FLAG_IMMUTABLE
             )
 
+        val overlayIntent = Intent(this, CropOverlayService::class.java)
+
+        val overlayPending = PendingIntent.getService(
+            this,
+            2,
+            overlayIntent,
+            PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification: Notification =
             NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("Fight Tracker Running")
                 .setContentText("Tracking rewards...")
                 .setSmallIcon(android.R.drawable.ic_media_play)
                 .addAction(
-                    android.R.drawable.ic_media_pause,
-                    "STOP",
-                    stopPendingIntent
+                    android.R.drawable.ic_menu_crop,
+                    "SET CROP",
+                    overlayPending
                 )
+//                .addAction(
+//                    android.R.drawable.ic_media_pause,
+//                    "STOP",
+//                    stopPendingIntent
+//                )
                 .build()
 
         startForeground(1, notification)
@@ -157,39 +172,65 @@ class FightTrackerService : Service() {
         }, interval)
     }
 
-    private fun removeIconsAndEnhance(src: Bitmap): Bitmap {
+//    private fun removeIconsAndEnhance(src: Bitmap): Bitmap {
+//
+//        val width = src.width
+//        val height = src.height
+//
+//        val out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+//
+//        val pixels = IntArray(width * height)
+//
+//        src.getPixels(pixels, 0, width, 0, 0, width, height)
+//
+//        for (i in pixels.indices) {
+//
+//            val pixel = pixels[i]
+//
+//            val r = (pixel shr 16) and 0xff
+//            val g = (pixel shr 8) and 0xff
+//            val b = pixel and 0xff
+//
+//            val isWhite =
+//                r > 170 &&
+//                        g > 170 &&
+//                        b > 170
+//
+//            val isPureWhite =
+//                r > 245 &&
+//                        g > 245 &&
+//                        b > 245
+//
+//            pixels[i] =
+//                if (isWhite)
+//                    android.graphics.Color.WHITE
+//                else
+//                    android.graphics.Color.BLACK
+//        }
+//
+//        out.setPixels(pixels, 0, width, 0, 0, width, height)
+//
+//        return out
+//    }
 
-        val width = src.width
-        val height = src.height
+    private fun applyUserCrop(fullBitmap: Bitmap): Bitmap {
 
-        val out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val rect = CropStore.load(this)
 
-        val pixels = IntArray(width * height)
+        // if user didn't set crop → fallback to full screen
+        if (rect == null) return fullBitmap
 
-        // Read all pixels in one native call
-        src.getPixels(pixels, 0, width, 0, 0, width, height)
+        val left = (fullBitmap.width * rect.left).toInt()
+        val top = (fullBitmap.height * rect.top).toInt()
+        val right = (fullBitmap.width * rect.right).toInt()
+        val bottom = (fullBitmap.height * rect.bottom).toInt()
 
-        for (i in pixels.indices) {
+        val width = (right - left).coerceAtLeast(1)
+        val height = (bottom - top).coerceAtLeast(1)
 
-            val pixel = pixels[i]
+        Log.d("OCR_CROP", "User crop: L=$left T=$top W=$width H=$height")
 
-            val r = (pixel shr 16) and 0xff
-            val g = (pixel shr 8) and 0xff
-            val b = pixel and 0xff
-
-            val brightness = (r + g + b) / 3
-
-            pixels[i] =
-                if (brightness > 150)
-                    android.graphics.Color.WHITE
-                else
-                    android.graphics.Color.BLACK
-        }
-
-        // Write all pixels back in one native call
-        out.setPixels(pixels, 0, width, 0, 0, width, height)
-
-        return out
+        return Bitmap.createBitmap(fullBitmap, left, top, width, height)
     }
 
     private fun scanScreen() {
@@ -198,48 +239,49 @@ class FightTrackerService : Service() {
             imageReader?.acquireLatestImage() ?: return
 
         val plane = image.planes[0]
-
         val buffer: ByteBuffer = plane.buffer
 
         val pixelStride = plane.pixelStride
         val rowStride = plane.rowStride
-        val rowPadding =
-            rowStride - pixelStride * image.width
+        val rowPadding = rowStride - pixelStride * image.width
 
-        val fullBitmap =
-            Bitmap.createBitmap(
-                image.width + rowPadding / pixelStride,
-                image.height,
-                Bitmap.Config.ARGB_8888
-            )
+        val fullBitmap = Bitmap.createBitmap(
+            image.width + rowPadding / pixelStride,
+            image.height,
+            Bitmap.Config.ARGB_8888
+        )
 
         fullBitmap.copyPixelsFromBuffer(buffer)
+        image.close()
 
-        //  crop only reward region (bottom + right side)
-//        val croppedBitmap = Bitmap.createBitmap(
-//            fullBitmap,
-//            (fullBitmap.width * 0.22).toInt(),   // skip left icons completely
-//            (fullBitmap.height * 0.35).toInt(),  // skip fight log
-//            (fullBitmap.width * 0.56).toInt(),   // keep right side
-//            (fullBitmap.height * 0.45).toInt()   // reward block
-//        )
+        // -----------------------------
+        // 1. LOAD USER CROP (0..1)
+        // -----------------------------
+        val savedCrop = CropStore.load(this)
+
+        val crop = savedCrop ?: RectF(0.2f, 0.2f, 0.8f, 0.8f)
+
+        val left = (crop.left * fullBitmap.width).toInt()
+        val top = (crop.top * fullBitmap.height).toInt()
+        val right = (crop.right * fullBitmap.width).toInt()
+        val bottom = (crop.bottom * fullBitmap.height).toInt()
+
+        val width = (right - left).coerceAtLeast(1)
+        val height = (bottom - top).coerceAtLeast(1)
 
         val croppedBitmap = Bitmap.createBitmap(
             fullBitmap,
-            (fullBitmap.width * 0.22).toInt(),   // start at 22% width
-            (fullBitmap.height * 0.10).toInt(),  // Starts at 10% height
-            (fullBitmap.width * 0.56).toInt(),   // covers right 56% width
-            (fullBitmap.height * 0.512).toInt()  // Covers down 51,2% height
+            left,
+            top,
+            width,
+            height
         )
 
-        image.close()
-
-
+        // -----------------------------
+        // 2. OPTIONAL SCALING
+        // -----------------------------
         val scaling =
-            if (SettingsStore.getHighQualityOcr(this))
-                1
-            else
-                2
+            if (SettingsStore.getHighQualityOcr(this)) 1 else 2
 
         val scaledBitmap = Bitmap.createScaledBitmap(
             croppedBitmap,
@@ -248,23 +290,21 @@ class FightTrackerService : Service() {
             false
         )
 
-        val cleanedBitmap = removeIconsAndEnhance(scaledBitmap)
+        // -----------------------------
+        // 3. OCR INPUT
+        // -----------------------------
+        val inputImage = InputImage.fromBitmap(scaledBitmap, 0)
 
-        val inputImage =
-            InputImage.fromBitmap(cleanedBitmap, 0)
-
-
-
-        Log.d(
-            "OCR_BITMAP",
-            "Processed bitmap: ${cleanedBitmap.width}x${cleanedBitmap.height}"
-        )
-
-
-
+        Log.d("OCR_BITMAP", "Full: ${fullBitmap.width}x${fullBitmap.height}")
+        Log.d("OCR_BITMAP", "Crop: L=$left T=$top W=$width H=$height")
+        Log.d("OCR_BITMAP", "Final OCR bitmap: ${scaledBitmap.width}x${scaledBitmap.height}")
 
         recognizer.process(inputImage)
             .addOnSuccessListener { visionText ->
+
+                if (DebugController.enabled) {
+                    OcrDebugBuffer.lastText = visionText.text
+                }
 
                 Log.d("OCR_RAW", "================ OCR FRAME ================")
                 Log.d("OCR_RAW", visionText.text)
@@ -273,29 +313,25 @@ class FightTrackerService : Service() {
 
                 if (
                     text.contains("victory") ||
-                    text.contains("VITORIA") ||
-                    text.contains("VÍCTORY!") ||
                     text.contains("experience") ||
                     text.contains("party") ||
                     text.contains("orns") ||
                     text.contains("gold") ||
                     text.contains("here's what you found") ||
                     text.contains("heres what you found") ||
-                    text.contains("DEFEATED") ||
-                    text.contains("DUNGEON COMPLETE") ||
-                    text.contains("BOSS DEFEATED") ||
-                    text.contains("Aqui está o que") ||
-                    text.contains("Aqui está") ||
-                    text.contains("ZWYCIĘSTWO") ||
-                    text.contains("Otrzymano") ||
-                    text.contains("COMPLETE")
+                    text.contains("defeated") ||
+                    text.contains("dungeon complete") ||
+                    text.contains("boss defeated") ||
+                    text.contains("complete") ||
+                    text.contains("zwcięstwo") ||
+                    text.contains("otrzymano")
                 ) {
                     parseRewards(text)
                 }
+
                 fullBitmap.recycle()
                 croppedBitmap.recycle()
                 scaledBitmap.recycle()
-                cleanedBitmap.recycle()
             }
             .addOnFailureListener { e ->
                 Log.e("OCR_RAW", "OCR FAILED", e)
@@ -330,7 +366,7 @@ class FightTrackerService : Service() {
                 sessionGold += extractNumber(clean)
             }
 
-            if (clean.contains("orns") || clean.contains("0rns") ||                                     //english+portuguese
+            if (clean.contains("orns") || clean.contains("0rns") || clean.contains("0rn5") || clean.contains("orn5") ||                                     //english+portuguese
                 clean.contains("ornów") || clean.contains("orndw") || clean.contains("ornỐW") || clean.contains("orn")) {   //polish
                 sessionOrns += extractNumber(clean)
             }

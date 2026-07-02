@@ -14,6 +14,8 @@ import android.util.Log
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.view.MotionEvent
+import android.widget.Toast
 
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -24,7 +26,9 @@ class TrackerFragment : Fragment() {
 
     private var _binding: FragmentTrackerBinding? = null
     private val binding get() = _binding!!
-
+    private val stopHoldHandler = Handler(Looper.getMainLooper())
+    private var stopHoldRunnable: Runnable? = null
+    private var isHolding = false
 
     override fun onResume() {
         super.onResume()
@@ -91,15 +95,83 @@ class TrackerFragment : Fragment() {
             recording = 1
         }
 
-        binding.stopButton.setOnClickListener {
 
-            if (recording == 1) {
 
-                recording = 0
+        binding.stopButton.setOnTouchListener { v, event ->
 
-                (activity as MainActivity).stopTracking()
+            when (event.action) {
 
-                renderHistory()
+                MotionEvent.ACTION_DOWN -> {
+
+                    isHolding = true
+
+                    stopHoldRunnable = Runnable {
+
+                        if (isHolding) {
+
+                            val enabled = DebugController.toggle()
+
+                            Toast.makeText(
+                                requireContext(),
+                                if (enabled) "debug enabled" else "debug disabled",
+                                Toast.LENGTH_SHORT
+                            ).show()
+
+                            val intent = Intent(
+                                requireContext(),
+                                OcrDebugOverlayService::class.java
+                            )
+
+                            if (enabled)
+                                requireContext().startService(intent)
+                            else
+                                requireContext().stopService(intent)
+
+                            // prevent normal click afterwards
+                            isHolding = false
+                        }
+                    }
+
+                    stopHoldHandler.postDelayed(stopHoldRunnable!!, 3000)
+
+                    true
+                }
+
+                MotionEvent.ACTION_UP -> {
+
+                    stopHoldRunnable?.let {
+                        stopHoldHandler.removeCallbacks(it)
+                    }
+
+                    if (isHolding) {
+
+                        isHolding = false
+
+                        if (recording == 1) {
+                            recording = 0
+                            (activity as MainActivity).stopTracking()
+                            renderHistory()
+                        }
+
+                    } else {
+                        // We already toggled debug, do nothing.
+                    }
+
+                    true
+                }
+
+                MotionEvent.ACTION_CANCEL -> {
+
+                    isHolding = false
+
+                    stopHoldRunnable?.let {
+                        stopHoldHandler.removeCallbacks(it)
+                    }
+
+                    true
+                }
+
+                else -> true
             }
         }
 

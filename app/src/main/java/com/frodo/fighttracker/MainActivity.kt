@@ -311,6 +311,9 @@ class MainActivity : AppCompatActivity() {
 
         }
 
+        if (FirstRunStore.isFirstRun(this)) {
+            startActivity(Intent(this, FirstRunActivity::class.java))
+        }
 
         projectionManager =
             getSystemService(

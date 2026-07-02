@@ -4,10 +4,10 @@
     <selectionStates>
       <SelectionState runConfigName="app">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2026-06-30T10:50:19.589422700Z">
+        <DropdownSelection timestamp="2026-07-02T10:36:45.083207500Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\HST\.android\avd\motorola_moto_g24_xt2423-1.avd" />
+              <DeviceId pluginId="LocalEmulator" identifier="path=E:\.androidAVD\.android\avd\motorola_moto_g24_xt2423-1.avd" />
             </handle>
           </Target>
         </DropdownSelection>
