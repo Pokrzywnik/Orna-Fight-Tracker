@@ -37,7 +37,8 @@ class MaterialsFragment : Fragment() {
             anguish,
             "sparring.csv",
             "trials.csv",
-            "towers.csv"
+            "towers.csv",
+            "towers_hoa.csv"
         )
     }
 
@@ -79,6 +80,7 @@ class MaterialsFragment : Fragment() {
             "sparring.csv" -> "Sparring"
             "trials.csv" -> "Trials"
             "towers.csv" -> "Towers"
+            "towers_hoa.csv" -> "Towers (HoA)"
             else -> file
         }
     }

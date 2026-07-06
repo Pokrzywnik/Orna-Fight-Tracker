@@ -1,69 +1,148 @@
 package com.frodo.fighttracker
 
 import android.app.Service
-import android.graphics.PixelFormat
+import android.content.Intent
+import android.graphics.*
 import android.os.*
 import android.view.*
+import android.widget.FrameLayout
 import android.widget.TextView
-import android.content.Intent
 
 class OcrDebugOverlayService : Service() {
 
     private lateinit var windowManager: WindowManager
-    private lateinit var overlay: TextView
+    private lateinit var root: FrameLayout
+    private lateinit var overlayText: TextView
+    private lateinit var overlayCanvas: DebugCanvas
 
     private val handler = Handler(Looper.getMainLooper())
 
     private val updater = object : Runnable {
         override fun run() {
 
-            overlay.text = OcrDebugBuffer.lastText ?: "waiting OCR..."
+            overlayText.text =
+                OcrDebugBuffer.lastText ?: "waiting OCR..."
 
-            handler.postDelayed(this, 500)
+            overlayCanvas.invalidate()
+
+            handler.postDelayed(this, 300)
         }
     }
 
     override fun onCreate() {
         super.onCreate()
 
-        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        windowManager =
+            getSystemService(WINDOW_SERVICE) as WindowManager
 
-        overlay = TextView(this).apply {
-            setPadding(24, 24, 24, 24)
-            textSize = 12f
-            setBackgroundColor(0xAA000000.toInt())
-            setTextColor(0xFFFFFFFF.toInt())
+        root = FrameLayout(this)
+
+        overlayCanvas = DebugCanvas(this)
+
+        overlayText = TextView(this).apply {
+
+            setTextColor(Color.WHITE)
+
+            textSize = 11f
+
+            setPadding(20,20,20,20)
         }
 
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else
-                WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-            PixelFormat.TRANSLUCENT
+        root.addView(
+            overlayCanvas,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
         )
 
-        params.gravity = Gravity.TOP or Gravity.START
-        params.x = 50
-        params.y = 200
+        root.addView(overlayText)
 
-        windowManager.addView(overlay, params)
+        val params =
+            WindowManager.LayoutParams(
+
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                else
+                    WindowManager.LayoutParams.TYPE_PHONE,
+
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+
+                PixelFormat.TRANSLUCENT
+            )
+
+        windowManager.addView(root, params)
 
         handler.post(updater)
     }
 
     override fun onDestroy() {
-        super.onDestroy()
 
         handler.removeCallbacks(updater)
 
-        if (::overlay.isInitialized) {
-            windowManager.removeView(overlay)
-        }
+        windowManager.removeView(root)
+
+        super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    class DebugCanvas(context: android.content.Context)
+        : View(context) {
+
+        private val green = Paint().apply {
+            color = Color.GREEN
+            style = Paint.Style.STROKE
+            strokeWidth = 4f
+        }
+
+        private val blue = Paint().apply {
+            color = Color.CYAN
+            style = Paint.Style.STROKE
+            strokeWidth = 4f
+        }
+
+        private val red = Paint().apply {
+            color = Color.RED
+            strokeWidth = 6f
+        }
+
+        private val yellow = Paint().apply {
+            color = Color.YELLOW
+            style = Paint.Style.STROKE
+            strokeWidth = 5f
+        }
+
+        override fun onDraw(canvas: Canvas) {
+
+            OcrDebugBuffer.userCrop?.let {
+                canvas.drawRect(it, green)
+            }
+
+            OcrDebugBuffer.finalCrop?.let {
+                canvas.drawRect(it, blue)
+            }
+
+            if (OcrDebugBuffer.detectedLeft >= 0) {
+
+                canvas.drawLine(
+                    OcrDebugBuffer.detectedLeft.toFloat(),
+                    0f,
+                    OcrDebugBuffer.detectedLeft.toFloat(),
+                    height.toFloat(),
+                    red
+                )
+            }
+
+            OcrDebugBuffer.bookmarkRect?.let {
+                canvas.drawRect(it, yellow)
+
+            }
+        }
+    }
 }

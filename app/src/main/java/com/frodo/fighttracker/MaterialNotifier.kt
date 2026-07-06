@@ -48,7 +48,8 @@ object MaterialNotifier {
             },
             "sparring.csv",
             "trials.csv",
-            "towers.csv"
+            "towers.csv",
+            "towers_hoa.csv"
         ).filter {
             SelectedGuilds.isEnabled(it)
         }

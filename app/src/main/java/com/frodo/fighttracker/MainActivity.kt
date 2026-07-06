@@ -247,24 +247,6 @@ class MainActivity : AppCompatActivity() {
         FightState.shards = 0L
     }
 
-//    override fun onResume() {
-//        super.onResume()
-//
-//        val fragments = listOf(
-//            TrackerFragment(),
-//            WebFragment("https://codex.fqegg.top/#/tower"),
-//            WebFragment(getCodexUrl()),
-//            MaterialsFragment()
-//        )
-//        binding.viewPager.adapter =
-//            object : androidx.viewpager2.adapter.FragmentStateAdapter(this) {
-//
-//                override fun getItemCount() = fragments.size
-//
-//                override fun createFragment(position: Int) =
-//                    fragments[position]
-//            }
-//    }
     override fun onCreate(savedInstanceState: Bundle?) {
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -311,9 +293,9 @@ class MainActivity : AppCompatActivity() {
 
         }
 
-        if (FirstRunStore.isFirstRun(this)) {
-            startActivity(Intent(this, FirstRunActivity::class.java))
-        }
+    if (FirstRunStore.shouldShow(this)) {
+        startActivity(Intent(this, FirstRunActivity::class.java))
+    }
 
         projectionManager =
             getSystemService(

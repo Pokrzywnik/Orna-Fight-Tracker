@@ -67,7 +67,7 @@ class CropOverlayService : Service() {
         private val paint = Paint().apply {
             color = Color.GREEN
             style = Paint.Style.STROKE
-            strokeWidth = 5f
+            strokeWidth = 2f
         }
 
         private val fill = Paint().apply {

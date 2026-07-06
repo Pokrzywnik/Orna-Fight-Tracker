@@ -25,7 +25,10 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.nio.ByteBuffer
-
+import android.graphics.Color
+import android.graphics.Rect
+import kotlin.math.max
+import kotlin.math.min
 
 
 class FightTrackerService : Service() {
@@ -46,6 +49,7 @@ class FightTrackerService : Service() {
     private var lastExp = -1L
 
 
+    private var rewardScreenSeen = false
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
@@ -172,6 +176,79 @@ class FightTrackerService : Service() {
         }, interval)
     }
 
+
+    private fun detectLeftEdge(bitmap: Bitmap): Int {
+
+        val w = bitmap.width
+        val h = bitmap.height
+
+        val pixels = IntArray(w * h)
+        bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
+
+        val score = IntArray(w)
+
+        // Count "text-like" pixels in every column
+        for (x in 0 until w) {
+
+            var count = 0
+
+            for (y in 0 until h) {
+
+                val c = pixels[y * w + x]
+
+                val r = (c shr 16) and 255
+                val g = (c shr 8) and 255
+                val b = c and 255
+
+                val brightness = (r + g + b) / 3
+
+                if (brightness > 170)
+                    count++
+            }
+
+            score[x] = count
+        }
+
+        // Smooth with moving average
+        val smooth = IntArray(w)
+
+        for (x in 0 until w) {
+
+            var sum = 0
+            var n = 0
+
+            for (k in max(0, x - 4)..min(w - 1, x + 4)) {
+                sum += score[k]
+                n++
+            }
+
+            smooth[x] = sum / n
+        }
+
+        // Average activity
+        val avg = smooth.average()
+
+        val threshold = max(8.0, avg * 1.35)
+
+        // Find first sustained block of text
+        for (x in 0 until w - 20) {
+
+            var good = true
+
+            for (k in 0 until 20) {
+
+                if (smooth[x + k] < threshold) {
+                    good = false
+                    break
+                }
+            }
+
+            if (good)
+                return x
+        }
+
+        return 0
+    }
 //    private fun removeIconsAndEnhance(src: Bitmap): Bitmap {
 //
 //        val width = src.width
@@ -212,25 +289,87 @@ class FightTrackerService : Service() {
 //
 //        return out
 //    }
+    private fun detectXpBookmark(bitmap: Bitmap): Rect? {
+        Log.d("BOOKMARK", "detectXpBookmark() called")
 
-    private fun applyUserCrop(fullBitmap: Bitmap): Bitmap {
+        val w = bitmap.width
+        val h = bitmap.height
 
-        val rect = CropStore.load(this)
+        val pixels = IntArray(w * h)
+        bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
 
-        // if user didn't set crop → fallback to full screen
-        if (rect == null) return fullBitmap
+        val searchWidth = w
+        val searchHeight = h
 
-        val left = (fullBitmap.width * rect.left).toInt()
-        val top = (fullBitmap.height * rect.top).toInt()
-        val right = (fullBitmap.width * rect.right).toInt()
-        val bottom = (fullBitmap.height * rect.bottom).toInt()
+        var bestX = -1
+        var bestStartY = -1
+        var bestRun = 0
 
-        val width = (right - left).coerceAtLeast(1)
-        val height = (bottom - top).coerceAtLeast(1)
+        for (x in 0 until searchWidth) {
 
-        Log.d("OCR_CROP", "User crop: L=$left T=$top W=$width H=$height")
+            var run = 0
+            var startY = 0
 
-        return Bitmap.createBitmap(fullBitmap, left, top, width, height)
+            for (y in 0 until searchHeight) {
+
+
+                val c = pixels[y * w + x]
+
+                val r = (c shr 16) and 255
+                val g = (c shr 8) and 255
+                val b = c and 255
+
+//                if (r > 140 && g < 120 && b < 120) {              //debug info - show pixels coords
+//
+//                    Log.d(
+//                        "BOOKMARK_PIXEL",
+//                        "x=$x y=$y  rgb=($r,$g,$b)"
+//                    )
+//                }
+
+                val red =
+                    r >= 150 &&
+                            g <= 70 &&
+                            b <= 70 &&
+                            r >= g + 70 &&
+                            r >= b + 70
+
+                if (red) {
+
+                    if (run == 0)
+                        startY = y
+
+                    run++
+
+                    if (run > bestRun) {
+                        bestRun = run
+                        bestX = x
+                        bestStartY = startY
+                    }
+
+                } else {
+
+                    run = 0
+                }
+            }
+        }
+
+        Log.d(
+            "BOOKMARK",
+            "bestRun=$bestRun bestX=$bestX bestY=$bestStartY"
+        )
+
+        if (bestRun < 3) {
+            Log.d("BOOKMARK", "FAILED bestRun=$bestRun")
+            return null
+        }
+
+        return Rect(
+            bestX,
+            bestStartY,
+            bestX + 1,
+            bestStartY + bestRun
+        )
     }
 
     private fun scanScreen() {
@@ -266,6 +405,11 @@ class FightTrackerService : Service() {
         val right = (crop.right * fullBitmap.width).toInt()
         val bottom = (crop.bottom * fullBitmap.height).toInt()
 
+        DebugOverlayData.userCropLeft = left
+        DebugOverlayData.userCropRight = right
+        DebugOverlayData.userCropTop = top
+        DebugOverlayData.userCropBottom = bottom
+
         val width = (right - left).coerceAtLeast(1)
         val height = (bottom - top).coerceAtLeast(1)
 
@@ -277,6 +421,65 @@ class FightTrackerService : Service() {
             height
         )
 
+        // Remember user's crop for debug overlay
+        OcrDebugBuffer.userCrop = android.graphics.Rect(
+            left,
+            top,
+            right,
+            bottom
+        )
+
+    // Detect where text actually begins
+        val bookmark = detectXpBookmark(croppedBitmap)
+
+        if (bookmark != null) {
+
+            OcrDebugBuffer.bookmarkRect = Rect(
+                left + bookmark.left,
+                top + bookmark.top,
+                left + bookmark.right,
+                top + bookmark.bottom
+            )
+
+        } else {
+
+            OcrDebugBuffer.bookmarkRect = null
+        }
+
+        var adjustedLeft =
+            if (bookmark != null)
+                bookmark.centerX() + 8
+            else
+                max(0, detectLeftEdge(croppedBitmap) - 20)
+
+        adjustedLeft = adjustedLeft.coerceIn(
+            0,
+            croppedBitmap.width - 20
+        )
+
+        DebugOverlayData.detectedLeft = adjustedLeft
+        DebugOverlayData.bitmapWidth = croppedBitmap.width
+
+        val finalBitmap = Bitmap.createBitmap(
+            croppedBitmap,
+            adjustedLeft,
+            0,
+            croppedBitmap.width - adjustedLeft,
+            croppedBitmap.height
+        )
+
+        // Debug overlay
+        OcrDebugBuffer.detectedLeft =
+            left + adjustedLeft
+
+        OcrDebugBuffer.finalCrop =
+            android.graphics.Rect(
+                left + adjustedLeft,
+                top,
+                right,
+                bottom
+            )
+
         // -----------------------------
         // 2. OPTIONAL SCALING
         // -----------------------------
@@ -284,9 +487,9 @@ class FightTrackerService : Service() {
             if (SettingsStore.getHighQualityOcr(this)) 1 else 2
 
         val scaledBitmap = Bitmap.createScaledBitmap(
-            croppedBitmap,
-            croppedBitmap.width / scaling,
-            croppedBitmap.height / scaling,
+            finalBitmap,
+            finalBitmap.width / scaling,
+            finalBitmap.height / scaling,
             false
         )
 
@@ -311,31 +514,55 @@ class FightTrackerService : Service() {
 
                 val text = visionText.text.lowercase()
 
-                if (
+                val isRewardScreen =
                     text.contains("victory") ||
-                    text.contains("experience") ||
-                    text.contains("party") ||
-                    text.contains("orns") ||
-                    text.contains("gold") ||
-                    text.contains("here's what you found") ||
-                    text.contains("heres what you found") ||
-                    text.contains("defeated") ||
-                    text.contains("dungeon complete") ||
-                    text.contains("boss defeated") ||
-                    text.contains("complete") ||
-                    text.contains("zwcięstwo") ||
-                    text.contains("otrzymano")
-                ) {
-                    parseRewards(text)
+                            text.contains("experience") ||
+                            text.contains("party") ||
+                            text.contains("orns") ||
+                            text.contains("gold") ||
+                            text.contains("here's what you found") ||
+                            text.contains("heres what you found") ||
+                            text.contains("defeated") ||
+                            text.contains("dungeon complete") ||
+                            text.contains("boss defeated") ||
+                            text.contains("complete") ||
+                            text.contains("zwcięstwo") ||
+                            text.contains("otrzymano")
+
+                if (isRewardScreen) {
+
+                    if (!rewardScreenSeen) {
+                        rewardScreenSeen = true
+                        parseRewards(text)
+                    }
+
+                } else {
+                    rewardScreenSeen = false
                 }
 
                 fullBitmap.recycle()
                 croppedBitmap.recycle()
+                finalBitmap.recycle()
                 scaledBitmap.recycle()
             }
             .addOnFailureListener { e ->
                 Log.e("OCR_RAW", "OCR FAILED", e)
             }
+    }
+
+    private fun extractBefore(text: String, keyword: String): Long {
+
+        val index = text.indexOf(keyword)
+        if (index == -1) return 0
+
+        val left = text.substring(0, index)
+
+        val match = Regex("""(\d[\d\s.,]*)$""").find(left)
+            ?: return 0
+
+        return match.value
+            .filter(Char::isDigit)
+            .toLongOrNull() ?: 0
     }
 
     private fun parseRewards(text: String) {
@@ -368,7 +595,7 @@ class FightTrackerService : Service() {
 
             if (clean.contains("orns") || clean.contains("0rns") || clean.contains("0rn5") || clean.contains("orn5") ||                                     //english+portuguese
                 clean.contains("ornów") || clean.contains("orndw") || clean.contains("ornỐW") || clean.contains("orn")) {   //polish
-                sessionOrns += extractNumber(clean)
+                sessionOrns += extractBefore(clean, "orns")
             }
 
             if (clean.contains("xp") || clean.contains("party xp") ||                                                                    //english
@@ -394,7 +621,7 @@ class FightTrackerService : Service() {
         lastExp = sessionExp
         lastShards = sessionShards
 
-        // add ONLY new results
+        // add only new results
         totalGold += sessionGold
         totalOrns += sessionOrns
         totalExp += sessionExp

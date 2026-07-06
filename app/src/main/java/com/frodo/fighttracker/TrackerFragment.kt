@@ -132,7 +132,7 @@ class TrackerFragment : Fragment() {
                         }
                     }
 
-                    stopHoldHandler.postDelayed(stopHoldRunnable!!, 3000)
+                    stopHoldHandler.postDelayed(stopHoldRunnable!!, 2000)
 
                     true
                 }

@@ -22,6 +22,7 @@ class OverlayService : Service() {
     private lateinit var ornsText: TextView
     private lateinit var xpText: TextView
     private lateinit var goldText: TextView
+    private var showPerMinute = true
 
     private val handler = Handler(Looper.getMainLooper())
 
@@ -33,14 +34,28 @@ class OverlayService : Service() {
                 ((System.currentTimeMillis() - FightState.startTime) / 60000.0)
                     .coerceAtLeast(1.0 / 60.0)
 
-            ornsText.text =
-                "${format((FightState.orns / minutes).toLong())}/min"
+            if (showPerMinute) {
 
-            xpText.text =
-                "${format((FightState.exp / minutes).toLong())}/min"
+                ornsText.text =
+                    "${formatShort((FightState.orns / minutes).toLong())}/min"
 
-            goldText.text =
-                "${format((FightState.gold / minutes).toLong())}/min"
+                xpText.text =
+                    "${formatShort((FightState.exp / minutes).toLong())}/min"
+
+                goldText.text =
+                    "${formatShort((FightState.gold / minutes).toLong())}/min"
+
+            } else {
+
+                ornsText.text =
+                    formatShort(FightState.orns)
+
+                xpText.text =
+                    formatShort(FightState.exp)
+
+                goldText.text =
+                    formatShort(FightState.gold)
+            }
 
             handler.postDelayed(this, 1000)
         }
@@ -93,12 +108,14 @@ class OverlayService : Service() {
             private var initialY = 0
             private var touchX = 0f
             private var touchY = 0f
+            private var downTime = 0L
 
             override fun onTouch(v: View?, event: android.view.MotionEvent): Boolean {
 
                 when (event.action) {
 
                     android.view.MotionEvent.ACTION_DOWN -> {
+                        downTime = System.currentTimeMillis()
                         initialX = params.x
                         initialY = params.y
                         touchX = event.rawX
@@ -107,6 +124,7 @@ class OverlayService : Service() {
                     }
 
                     android.view.MotionEvent.ACTION_MOVE -> {
+
                         val dx = (event.rawX - touchX).toInt()
                         val dy = (event.rawY - touchY).toInt()
 
@@ -114,6 +132,22 @@ class OverlayService : Service() {
                         params.y = initialY + dy
 
                         windowManager.updateViewLayout(overlayView, params)
+                        return true
+                    }
+
+                    android.view.MotionEvent.ACTION_UP -> {
+
+                        val moved =
+                            kotlin.math.abs(event.rawX - touchX) > 20 ||
+                                    kotlin.math.abs(event.rawY - touchY) > 20
+
+                        val shortTap =
+                            System.currentTimeMillis() - downTime < 250
+
+                        if (!moved && shortTap) {
+                            showPerMinute = !showPerMinute
+                        }
+
                         return true
                     }
                 }
@@ -135,12 +169,23 @@ class OverlayService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun format(value: Long): String {
+    private fun formatShort(value: Long): String {
 
-        return value.toString()
-            .reversed()
-            .chunked(3)
-            .joinToString(" ")
-            .reversed()
+        val v = value.toDouble()
+
+        return when {
+
+            v >= 1_000_000_000 ->
+                String.format("%.1f B", v / 1_000_000_000)
+
+            v >= 1_000_000 ->
+                String.format("%.1f M", v / 1_000_000)
+
+            v >= 1_000 ->
+                String.format("%.1f K", v / 1_000)
+
+            else ->
+                value.toString()
+        }
     }
 }
