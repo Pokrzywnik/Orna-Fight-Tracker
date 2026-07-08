@@ -19,6 +19,18 @@
         android:theme="@style/Theme.Material3.DayNight.NoActionBar"
         android:name=".FightTrackerApp">
 
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths"/>
+
+        </provider>
+
         <activity
             android:name=".MainActivity"
             android:launchMode="singleTop"
@@ -34,6 +46,9 @@
             android:name=".FirstRunActivity"
             android:exported="false"
             android:theme="@android:style/Theme.DeviceDefault.Dialog"/>
+        <service
+            android:name=".RewardConfirmOverlayService"
+            android:exported="false"/>
 
         <service
             android:name=".FightTrackerService"

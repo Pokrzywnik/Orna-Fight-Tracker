@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="280dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="18dp"
+    android:gravity="center_horizontal"
+    android:background="@drawable/overlay_background">
+
+    <ImageView
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:src="@drawable/orns"
+        android:layout_marginBottom="12dp"/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Anomaly detected!"
+        android:textStyle="bold"
+        android:textSize="18sp"
+        android:gravity="center"
+        android:textColor="#FFFFFF"/>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Unusually high Orns.\nConfirm this value?"
+        android:gravity="center"
+        android:textColor="#DDDDDD"
+        android:textSize="14sp"
+        android:paddingTop="8dp"
+        android:paddingBottom="14dp"/>
+
+    <TextView
+        android:id="@+id/rewardValue"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="3.6 M Orns"
+        android:textStyle="bold"
+        android:textSize="28sp"
+        android:gravity="center"
+        android:textColor="#FFFFFF"
+        android:paddingBottom="16dp"/>
+
+    <TextView
+        android:id="@+id/infoText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Auto-accept in 3s"
+        android:textSize="13sp"
+        android:textColor="#AAAAAA"
+        android:gravity="center"
+        android:paddingBottom="18dp"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/denyButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Deny"/>
+
+        <Space
+            android:layout_width="12dp"
+            android:layout_height="1dp"/>
+
+        <Button
+            android:id="@+id/acceptButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Accept"/>
+
+    </LinearLayout>
+
+</LinearLayout>

@@ -22,7 +22,8 @@ class OverlayService : Service() {
     private lateinit var ornsText: TextView
     private lateinit var xpText: TextView
     private lateinit var goldText: TextView
-    private var showPerMinute = true
+    private var displayMode = 0
+    private lateinit var headerText: TextView
 
     private val handler = Handler(Looper.getMainLooper())
 
@@ -33,28 +34,47 @@ class OverlayService : Service() {
             val minutes =
                 ((System.currentTimeMillis() - FightState.startTime) / 60000.0)
                     .coerceAtLeast(1.0 / 60.0)
+            when (displayMode) {
 
-            if (showPerMinute) {
+                // Totals
+                0 -> {
 
-                ornsText.text =
-                    "${formatShort((FightState.orns / minutes).toLong())}/min"
+                    headerText.text = "Total"
 
-                xpText.text =
-                    "${formatShort((FightState.exp / minutes).toLong())}/min"
+                    ornsText.text = formatShort(FightState.orns)
+                    xpText.text = formatShort(FightState.exp)
+                    goldText.text = formatShort(FightState.gold)
+                }
 
-                goldText.text =
-                    "${formatShort((FightState.gold / minutes).toLong())}/min"
+                // Per minute
+                1 -> {
 
-            } else {
+                    headerText.text = "Average"
 
-                ornsText.text =
-                    formatShort(FightState.orns)
+                    ornsText.text =
+                        "${formatShort((FightState.orns / minutes).toLong())}/m"
 
-                xpText.text =
-                    formatShort(FightState.exp)
+                    xpText.text =
+                        "${formatShort((FightState.exp / minutes).toLong())}/m"
 
-                goldText.text =
-                    formatShort(FightState.gold)
+                    goldText.text =
+                        "${formatShort((FightState.gold / minutes).toLong())}/m"
+                }
+
+                // Last reward
+                2 -> {
+
+                    headerText.text = "Last Reward"
+
+                    ornsText.text =
+                        "+${formatShort(FightState.lastOrns)}"
+
+                    xpText.text =
+                        "+${formatShort(FightState.lastExp)}"
+
+                    goldText.text =
+                        "+${formatShort(FightState.lastGold)}"
+                }
             }
 
             handler.postDelayed(this, 1000)
@@ -74,6 +94,7 @@ class OverlayService : Service() {
         ornsText = overlayView.findViewById(R.id.ornsText)
         xpText = overlayView.findViewById(R.id.xpText)
         goldText = overlayView.findViewById(R.id.goldText)
+        headerText = overlayView.findViewById(R.id.headerText)
 
         val params = WindowManager.LayoutParams(
 
@@ -145,7 +166,7 @@ class OverlayService : Service() {
                             System.currentTimeMillis() - downTime < 250
 
                         if (!moved && shortTap) {
-                            showPerMinute = !showPerMinute
+                            displayMode = (displayMode + 1) % 3
                         }
 
                         return true

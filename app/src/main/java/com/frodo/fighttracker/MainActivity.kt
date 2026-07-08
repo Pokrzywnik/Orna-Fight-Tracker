@@ -249,6 +249,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
+        UpdateChecker.check(this)
+
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
 
         val alarmManager =
@@ -306,21 +308,27 @@ class MainActivity : AppCompatActivity() {
         val towerFragment =
             WebFragment.newInstance("https://codex.fqegg.top/#/tower")
 
+        val monumentsFragment =
+            WebFragment.newInstance("https://floorchart.top/")
+
         codexFragment =
             WebFragment.newInstance(getCodexUrl())
 
+
         val fragments = listOf(
             TrackerFragment(),
-            towerFragment,
+            MaterialsFragment(),
             codexFragment,
-            MaterialsFragment()
+            monumentsFragment,
+            towerFragment
         )
 
         val titles = listOf(
             "Tracker",
-            "Towers",
+            "Materials",
             "Codex",
-            "Materials"
+            "Monuments",
+            "Towers"
         )
         binding.settingsFab.setOnClickListener {
             showSettingsDialog()
@@ -454,7 +462,42 @@ class MainActivity : AppCompatActivity() {
             dialogView.findViewById<android.widget.CheckBox>(
                 R.id.highQualityOcrCheck
             )
+        val shareLogsButton =
+            dialogView.findViewById<android.widget.Button>(
+                R.id.shareLogsButton
+            )
 
+
+        shareLogsButton.setOnClickListener {
+
+            val file = TrackerLogger.getFile(this)
+
+            if (file != null && file.exists()) {
+
+                val uri =
+                    androidx.core.content.FileProvider.getUriForFile(
+                        this,
+                        "${packageName}.provider",
+                        file
+                    )
+
+                val share =
+                    Intent(Intent.ACTION_SEND)
+
+                share.type = "text/plain"
+                share.putExtra(Intent.EXTRA_STREAM, uri)
+                share.addFlags(
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+
+                startActivity(
+                    Intent.createChooser(
+                        share,
+                        "Share Fight Tracker Logs"
+                    )
+                )
+            }
+        }
         highQualityCheck.isChecked =
             SettingsStore.getHighQualityOcr(this)
 

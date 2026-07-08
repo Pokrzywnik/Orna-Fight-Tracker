@@ -462,7 +462,8 @@ class MaterialsFragment : Fragment() {
             scroll,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                900
+                0,
+                1f
             )
         )
 

@@ -8,6 +8,7 @@ object TrackingController {
     fun start() {
         isRunning = true
         startTime = System.currentTimeMillis()
+        FightState.ornsConfirmationThreshold = 30L
     }
 
     fun stop(): Long {

@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.webkit.WebViewClient
 import androidx.fragment.app.Fragment
 import com.frodo.fighttracker.databinding.FragmentWebBinding
+import androidx.activity.OnBackPressedCallback
 
 class WebFragment : Fragment() {
 
@@ -43,6 +44,25 @@ class WebFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+
+        requireActivity()
+            .onBackPressedDispatcher
+            .addCallback(
+                viewLifecycleOwner,
+                object : OnBackPressedCallback(true) {
+
+                    override fun handleOnBackPressed() {
+
+                        if (binding.webView.canGoBack()) {
+                            binding.webView.goBack()
+                        } else {
+                            isEnabled = false
+                            requireActivity().onBackPressedDispatcher.onBackPressed()
+
+                        }
+                    }
+                }
+            )
 
         _binding =
             FragmentWebBinding.inflate(

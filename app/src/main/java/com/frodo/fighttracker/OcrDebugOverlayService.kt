@@ -20,8 +20,47 @@ class OcrDebugOverlayService : Service() {
     private val updater = object : Runnable {
         override fun run() {
 
-            overlayText.text =
-                OcrDebugBuffer.lastText ?: "waiting OCR..."
+            val sb = StringBuilder()
+
+            sb.append(OcrDebugBuffer.lastText ?: "waiting OCR...")
+
+            sb.append("\n\n")
+
+            sb.append("XP edge X: ")
+            sb.append(OcrDebugBuffer.xpRect?.left ?: "-")
+            sb.append("   Y: ")
+            sb.append(OcrDebugBuffer.xpRect?.top ?: "-")
+
+            sb.append("\n")
+
+            sb.append("Orns edge X: ")
+            sb.append(OcrDebugBuffer.ornsRect?.left ?: "-")
+            sb.append("   Y: ")
+            sb.append(OcrDebugBuffer.ornsRect?.top ?: "-")
+
+            sb.append("\n")
+
+            sb.append("Gold edge X: ")
+            sb.append(OcrDebugBuffer.goldRect?.left ?: "-")
+            sb.append("   Y: ")
+            sb.append(OcrDebugBuffer.goldRect?.top ?: "-")
+
+            sb.append("\n")
+
+            sb.append("Detected X: ")
+            sb.append(
+                if (OcrDebugBuffer.detectedLeft >= 0)
+                    OcrDebugBuffer.detectedLeft
+                else
+                    "-"
+            )
+
+            sb.append("   Y: ")
+            sb.append(
+                OcrDebugBuffer.bookmarkRect?.centerY() ?: "-"
+            )
+
+            overlayText.text = sb.toString()
 
             overlayCanvas.invalidate()
 
@@ -118,6 +157,12 @@ class OcrDebugOverlayService : Service() {
             strokeWidth = 5f
         }
 
+        private val magenta = Paint().apply {
+            color = Color.MAGENTA
+            style = Paint.Style.STROKE
+            strokeWidth = 1f
+        }
+
         override fun onDraw(canvas: Canvas) {
 
             OcrDebugBuffer.userCrop?.let {
@@ -143,6 +188,19 @@ class OcrDebugOverlayService : Service() {
                 canvas.drawRect(it, yellow)
 
             }
+
+            OcrDebugBuffer.xpRect?.let {
+                canvas.drawRect(it, magenta)
+            }
+
+            OcrDebugBuffer.ornsRect?.let {
+                canvas.drawRect(it, magenta)
+            }
+
+            OcrDebugBuffer.goldRect?.let {
+                canvas.drawRect(it, magenta)
+            }
+
         }
     }
 }

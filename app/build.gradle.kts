@@ -11,8 +11,8 @@ android {
         applicationId = "com.frodo.fighttracker"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.9.2"
+        versionCode = 12
+        versionName = "2.1"
     }
 
     buildTypes {
@@ -32,6 +32,7 @@ android {
 
     buildFeatures {
         viewBinding = true
+        buildConfig = true
     }
 }
 
