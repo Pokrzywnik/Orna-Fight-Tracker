@@ -91,7 +91,7 @@ class TrackerFragment : Fragment() {
 
         binding.startButton.setOnClickListener {
             FightState.startTime = System.currentTimeMillis()
-            FightState.ornsConfirmationThreshold = 30L
+            FightState.ornsConfirmationThreshold = 3_000_000L
             (activity as MainActivity).startCapture()
             recording = 1
         }

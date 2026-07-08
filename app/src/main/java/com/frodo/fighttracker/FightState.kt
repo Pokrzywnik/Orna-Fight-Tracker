@@ -10,5 +10,5 @@ object FightState {
     var lastOrns = 0L
     var lastExp = 0L
     var lastShards = 0L
-    var ornsConfirmationThreshold = 30L
+    var ornsConfirmationThreshold = 3_000_000L
 }
