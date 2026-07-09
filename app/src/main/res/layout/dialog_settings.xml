@@ -37,6 +37,11 @@
     android:textSize="12sp"
     android:textColor="#888888"
     android:paddingBottom="12dp"/>
+<CheckBox
+    android:id="@+id/legacyOcrCheck"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="Use legacy OCR algorithm" />
     <!-- ========================= -->
     <!-- CODEx + ANGUISH ROW -->
     <!-- ========================= -->
@@ -177,12 +182,6 @@
         android:layout_height="wrap_content"
         android:text="Share Debug Logs"
         android:layout_marginTop="20dp"/>
-<Button
-    android:id="@+id/shareCrashLogsButton"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:text="Share Crash Logs"
-    android:layout_marginTop="8dp"/>
 
 </LinearLayout>
 </ScrollView>

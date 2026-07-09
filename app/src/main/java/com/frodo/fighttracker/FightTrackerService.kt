@@ -98,11 +98,6 @@ class FightTrackerService : Service() {
                     "SET CROP",
                     overlayPending
                 )
-//                .addAction(
-//                    android.R.drawable.ic_media_pause,
-//                    "STOP",
-//                    stopPendingIntent
-//                )
                 .build()
 
         startForeground(1, notification)
@@ -250,68 +245,112 @@ class FightTrackerService : Service() {
 
         return 0
     }
-//    private fun removeIconsAndEnhance(src: Bitmap): Bitmap {
-//
-//        val width = src.width
-//        val height = src.height
-//
-//        val out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-//
-//        val pixels = IntArray(width * height)
-//
-//        src.getPixels(pixels, 0, width, 0, 0, width, height)
-//
-//        for (i in pixels.indices) {
-//
-//            val pixel = pixels[i]
-//
-//            val r = (pixel shr 16) and 0xff
-//            val g = (pixel shr 8) and 0xff
-//            val b = pixel and 0xff
-//
-//            val isWhite =
-//                r > 170 &&
-//                        g > 170 &&
-//                        b > 170
-//
-//            val isPureWhite =
-//                r > 245 &&
-//                        g > 245 &&
-//                        b > 245
-//
-//            pixels[i] =
-//                if (isWhite)
-//                    android.graphics.Color.WHITE
-//                else
-//                    android.graphics.Color.BLACK
-//        }
-//
-//        out.setPixels(pixels, 0, width, 0, 0, width, height)
-//
-//        return out
-//    }
-private fun detectXpBookmark(
-    bitmap: Bitmap,
-    xpRect: Rect
-): Rect? {
 
-    val strong = findRedBookmark(
-        bitmap,
-        xpRect,
-        false
-    )
+    private fun detectXpBookmarklegacy(bitmap: Bitmap): Rect? {
+        Log.d("BOOKMARK", "detectXpBookmark() called")
 
-    if (strong != null)
-        return strong
+        val w = bitmap.width
+        val h = bitmap.height
+
+        val pixels = IntArray(w * h)
+        bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
+
+        val searchWidth = w
+        val searchHeight = h
+
+        var bestX = -1
+        var bestStartY = -1
+        var bestRun = 0
+
+        for (x in 0 until searchWidth) {
+
+            var run = 0
+            var startY = 0
+
+            for (y in 0 until searchHeight) {
 
 
-    // weaker red fallback
-    return findRedBookmark(
-        bitmap,
-        xpRect,
-        true
-    )
-}
+                val c = pixels[y * w + x]
+
+                val r = (c shr 16) and 255
+                val g = (c shr 8) and 255
+                val b = c and 255
+
+//                if (r > 140 && g < 120 && b < 120) {              //debug info - show pixels coords
+//
+//                    Log.d(
+//                        "BOOKMARK_PIXEL",
+//                        "x=$x y=$y  rgb=($r,$g,$b)"
+//                    )
+//                }
+
+                val red =
+                    r >= 150 &&
+                            g <= 70 &&
+                            b <= 70 &&
+                            r >= g + 70 &&
+                            r >= b + 70
+
+                if (red) {
+
+                    if (run == 0)
+                        startY = y
+
+                    run++
+
+                    if (run > bestRun) {
+                        bestRun = run
+                        bestX = x
+                        bestStartY = startY
+                    }
+
+                } else {
+
+                    run = 0
+                }
+            }
+        }
+
+        Log.d(
+            "BOOKMARK",
+            "bestRun=$bestRun bestX=$bestX bestY=$bestStartY"
+        )
+
+        if (bestRun < 3) {
+            Log.d("BOOKMARK", "FAILED bestRun=$bestRun")
+            return null
+        }
+
+        return Rect(
+            bestX,
+            bestStartY,
+            bestX + 1,
+            bestStartY + bestRun
+        )
+    }
+
+    private fun detectXpBookmark(
+        bitmap: Bitmap,
+        xpRect: Rect
+    ): Rect? {
+
+        val strong = findRedBookmark(
+            bitmap,
+            xpRect,
+            false
+        )
+
+        if (strong != null)
+            return strong
+
+
+        // weaker red fallback
+        return findRedBookmark(
+            bitmap,
+            xpRect,
+            true
+        )
+    }
 
 
     private fun findRedBookmark(
@@ -379,11 +418,14 @@ private fun detectXpBookmark(
 
     private fun scanScreen() {
 
+        if (SettingsStore.getLegacyOcr(this)) {
+            scanScreenLegacy()
+        } else {
+            scanScreenModern()
+        }
+    }
 
-//        if (ocrBusy)
-//            return
-
-        ocrBusy = true
+    private fun scanScreenLegacy() {
 
         val image: Image =
             imageReader?.acquireLatestImage() ?: return
@@ -440,9 +482,190 @@ private fun detectXpBookmark(
             bottom
         )
 
+        // Detect where text actually begins
+        val bookmark = detectXpBookmarklegacy(croppedBitmap)
+
+        if (bookmark != null) {
+
+            OcrDebugBuffer.bookmarkRect = Rect(
+                left + bookmark.left,
+                top + bookmark.top,
+                left + bookmark.right,
+                top + bookmark.bottom
+            )
+
+        } else {
+
+            OcrDebugBuffer.bookmarkRect = null
+        }
+
+        var adjustedLeft =
+            if (bookmark != null)
+                bookmark.centerX() + 8
+            else
+                max(0, detectLeftEdge(croppedBitmap) - 20)
+
+        adjustedLeft = adjustedLeft.coerceIn(
+            0,
+            croppedBitmap.width - 20
+        )
+
+        DebugOverlayData.detectedLeft = adjustedLeft
+        DebugOverlayData.bitmapWidth = croppedBitmap.width
+
+        val finalBitmap = Bitmap.createBitmap(
+            croppedBitmap,
+            adjustedLeft,
+            0,
+            croppedBitmap.width - adjustedLeft,
+            croppedBitmap.height
+        )
+
+        // Debug overlay
+        OcrDebugBuffer.detectedLeft =
+            left + adjustedLeft
+
+        OcrDebugBuffer.finalCrop =
+            android.graphics.Rect(
+                left + adjustedLeft,
+                top,
+                right,
+                bottom
+            )
+
         // -----------------------------
+        // 2. OPTIONAL SCALING
+        // -----------------------------
+        val scaling =
+            if (SettingsStore.getHighQualityOcr(this)) 1 else 2
+
+        val scaledBitmap = Bitmap.createScaledBitmap(
+            finalBitmap,
+            finalBitmap.width / scaling,
+            finalBitmap.height / scaling,
+            false
+        )
+
+        // -----------------------------
+        // 3. OCR INPUT
+        // -----------------------------
+        val inputImage = InputImage.fromBitmap(scaledBitmap, 0)
+
+        Log.d("OCR_BITMAP", "Full: ${fullBitmap.width}x${fullBitmap.height}")
+        Log.d("OCR_BITMAP", "Crop: L=$left T=$top W=$width H=$height")
+        Log.d("OCR_BITMAP", "Final OCR bitmap: ${scaledBitmap.width}x${scaledBitmap.height}")
+
+        recognizer.process(inputImage)
+            .addOnSuccessListener { visionText ->
+
+                if (DebugController.enabled) {
+                    OcrDebugBuffer.lastText = visionText.text
+                }
+
+                Log.d("OCR_RAW", "================ OCR FRAME ================")
+                Log.d("OCR_RAW", visionText.text)
+
+                val text = visionText.text.lowercase()
+
+                val isRewardScreen =
+                    text.contains("victory") ||
+                            text.contains("experience") ||
+                            text.contains("party") ||
+                            text.contains("orns") ||
+                            text.contains("gold") ||
+                            text.contains("here's what you found") ||
+                            text.contains("heres what you found") ||
+                            text.contains("defeated") ||
+                            text.contains("dungeon complete") ||
+                            text.contains("boss defeated") ||
+                            text.contains("complete") ||
+                            text.contains("zwcięstwo") ||
+                            text.contains("otrzymano")
+
+                if (isRewardScreen) {
+
+                    if (!rewardScreenSeen) {
+                        rewardScreenSeen = true
+                        parseRewards(text)
+                    }
+
+                } else {
+                    rewardScreenSeen = false
+                }
+
+                fullBitmap.recycle()
+                croppedBitmap.recycle()
+                finalBitmap.recycle()
+                scaledBitmap.recycle()
+            }
+            .addOnFailureListener { e ->
+                Log.e("OCR_RAW", "OCR FAILED", e)
+            }
+    }
+
+    private fun scanScreenModern() {
+
+//        if (ocrBusy)
+//            return
+
+        ocrBusy = true
+
+        val image: Image =
+            imageReader?.acquireLatestImage() ?: return
+
+        val plane = image.planes[0]
+        val buffer: ByteBuffer = plane.buffer
+
+        val pixelStride = plane.pixelStride
+        val rowStride = plane.rowStride
+        val rowPadding = rowStride - pixelStride * image.width
+
+        val fullBitmap = Bitmap.createBitmap(
+            image.width + rowPadding / pixelStride,
+            image.height,
+            Bitmap.Config.ARGB_8888
+        )
+
+        fullBitmap.copyPixelsFromBuffer(buffer)
+        image.close()
+
+        // 1. LOAD USER CROP (0..1)
+
+        val savedCrop = CropStore.load(this)
+
+        val crop = savedCrop ?: RectF(0.2f, 0.2f, 0.8f, 0.8f)
+
+        val left = (crop.left * fullBitmap.width).toInt()
+        val top = (crop.top * fullBitmap.height).toInt()
+        val right = (crop.right * fullBitmap.width).toInt()
+        val bottom = (crop.bottom * fullBitmap.height).toInt()
+
+        DebugOverlayData.userCropLeft = left
+        DebugOverlayData.userCropRight = right
+        DebugOverlayData.userCropTop = top
+        DebugOverlayData.userCropBottom = bottom
+
+        val width = (right - left).coerceAtLeast(1)
+        val height = (bottom - top).coerceAtLeast(1)
+
+        val croppedBitmap = Bitmap.createBitmap(
+            fullBitmap,
+            left,
+            top,
+            width,
+            height
+        )
+
+        // Remember user's crop for debug overlay
+        OcrDebugBuffer.userCrop = android.graphics.Rect(
+            left,
+            top,
+            right,
+            bottom
+        )
+
         // FIRST OCR PASS - FIND REWARD ROWS
-        // -----------------------------
+
 
         val firstInput = InputImage.fromBitmap(
             croppedBitmap,
@@ -563,9 +786,9 @@ private fun detectXpBookmark(
                 OcrDebugBuffer.finalCrop = Rect(left + adjustedLeft, top, right, bottom)
                 OcrDebugBuffer.bookmarkRect = null
 
-                // -----------------------------
+
                 // SECOND OCR PASS - REAL TRACKING
-                // -----------------------------
+
 
                 val scaling = if (SettingsStore.getHighQualityOcr(this)) 1 else 2
 

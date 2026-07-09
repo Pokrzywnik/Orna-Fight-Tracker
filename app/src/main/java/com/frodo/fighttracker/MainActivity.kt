@@ -35,6 +35,19 @@ private lateinit var codexFragment: WebFragment
 object SettingsStore {
 
     private const val KEY_HIGH_QUALITY_OCR = "high_quality_ocr"
+    private const val KEY_LEGACY_OCR = "legacy_ocr"
+
+    fun getLegacyOcr(context: Context): Boolean {
+        return context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+            .getBoolean(KEY_LEGACY_OCR, false)
+    }
+
+    fun setLegacyOcr(context: Context, value: Boolean) {
+        context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_LEGACY_OCR, value)
+            .apply()
+    }
 
     fun getHighQualityOcr(context: Context): Boolean {
         return context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
@@ -461,6 +474,10 @@ class MainActivity : AppCompatActivity() {
             dialogView.findViewById<android.widget.CheckBox>(
                 R.id.highQualityOcrCheck
             )
+        val legacyOcrCheck =
+            dialogView.findViewById<android.widget.CheckBox>(
+                R.id.legacyOcrCheck
+            )
         val shareLogsButton =
             dialogView.findViewById<android.widget.Button>(
                 R.id.shareLogsButton
@@ -498,6 +515,9 @@ class MainActivity : AppCompatActivity() {
         }
         highQualityCheck.isChecked =
             SettingsStore.getHighQualityOcr(this)
+
+        legacyOcrCheck.isChecked =
+            SettingsStore.getLegacyOcr(this)
 
         notifyCheck.isChecked =
             SettingsStore.getMaterialNotifications(this)
@@ -620,6 +640,10 @@ class MainActivity : AppCompatActivity() {
                 SettingsStore.setHighQualityOcr(
                     this,
                     highQualityCheck.isChecked
+                )
+                SettingsStore.setLegacyOcr(
+                    this,
+                    legacyOcrCheck.isChecked
                 )
                 val oldCodex = SettingsStore.getCodexType(this)
 
