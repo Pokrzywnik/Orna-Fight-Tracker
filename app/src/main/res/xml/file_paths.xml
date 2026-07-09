@@ -6,4 +6,8 @@
         name="downloads"
         path="Download/" />
 
+    <files-path
+        name="internal"
+        path="." />
+
 </paths>

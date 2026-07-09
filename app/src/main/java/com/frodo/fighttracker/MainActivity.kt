@@ -248,7 +248,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-
         UpdateChecker.check(this)
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -466,7 +465,6 @@ class MainActivity : AppCompatActivity() {
             dialogView.findViewById<android.widget.Button>(
                 R.id.shareLogsButton
             )
-
 
         shareLogsButton.setOnClickListener {
 

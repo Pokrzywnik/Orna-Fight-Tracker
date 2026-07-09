@@ -18,6 +18,7 @@ class FloatingTrackerService : Service() {
     private lateinit var floatingView: View
     private lateinit var params: WindowManager.LayoutParams
 
+
     override fun onTaskRemoved(rootIntent: Intent?) {
         stopSelf()
         super.onTaskRemoved(rootIntent)
@@ -55,7 +56,7 @@ class FloatingTrackerService : Service() {
     }
 
     private fun setupButton(button: ImageView) {
-
+        
         var initialX = 0
         var initialY = 0
         var touchX = 0f

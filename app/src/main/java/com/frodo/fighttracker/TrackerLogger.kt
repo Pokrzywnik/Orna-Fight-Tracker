@@ -1,7 +1,6 @@
 package com.frodo.fighttracker
 
 import android.content.Context
-import android.os.Environment
 import java.io.File
 
 object TrackerLogger {
@@ -13,16 +12,9 @@ object TrackerLogger {
 
     fun startNewSession(context: Context) {
 
-        val downloads =
-            Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_DOWNLOADS
-            )
+        logFile = File(context.filesDir, FILE_NAME)
 
-        logFile = File(downloads, FILE_NAME)
-
-        logFile?.writeText(
-            "=== Fight Tracker Debug Log ===\n\n"
-        )
+        logFile!!.writeText("=== Fight Tracker Debug Log ===\n\n")
     }
 
 
@@ -45,16 +37,7 @@ object TrackerLogger {
     }
 
 
-    fun getFile(context: Context): File? {
-
-        if (logFile != null)
-            return logFile
-
-        val downloads =
-            Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_DOWNLOADS
-            )
-
-        return File(downloads, FILE_NAME)
+    fun getFile(context: Context): File {
+        return logFile ?: File(context.filesDir, FILE_NAME)
     }
 }

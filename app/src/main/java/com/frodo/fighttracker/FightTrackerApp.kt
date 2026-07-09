@@ -9,6 +9,9 @@ import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 
 class FightTrackerApp : Application(), ImageLoaderFactory {
+    override fun onCreate() {
+        super.onCreate()
+    }
 
     @RequiresApi(Build.VERSION_CODES.P)
     override fun newImageLoader(): ImageLoader {
@@ -22,4 +25,5 @@ class FightTrackerApp : Application(), ImageLoaderFactory {
             }
             .build()
     }
+
 }

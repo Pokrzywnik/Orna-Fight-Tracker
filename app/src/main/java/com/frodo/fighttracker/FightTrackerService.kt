@@ -48,6 +48,7 @@ class FightTrackerService : Service() {
     private var lastOrns = -1L
     private var lastExp = -1L
 
+    private var ocrBusy = false
 
     private var rewardScreenSeen = false
     private var mediaProjection: MediaProjection? = null
@@ -377,6 +378,12 @@ private fun detectXpBookmark(
     }
 
     private fun scanScreen() {
+
+
+//        if (ocrBusy)
+//            return
+
+        ocrBusy = true
 
         val image: Image =
             imageReader?.acquireLatestImage() ?: return
@@ -728,6 +735,7 @@ private fun detectXpBookmark(
                     .addOnFailureListener { e ->
                         Log.e("OCR_RAW", "OCR FAILED", e)
                     }
+                //ocrBusy = false
             }
     }
 

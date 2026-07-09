@@ -177,6 +177,12 @@
         android:layout_height="wrap_content"
         android:text="Share Debug Logs"
         android:layout_marginTop="20dp"/>
+<Button
+    android:id="@+id/shareCrashLogsButton"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="Share Crash Logs"
+    android:layout_marginTop="8dp"/>
 
 </LinearLayout>
 </ScrollView>

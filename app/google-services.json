@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "832450518013",
+    "project_id": "orna-fight-tracker",
+    "storage_bucket": "orna-fight-tracker.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:832450518013:android:a3ce222d09191758569794",
+        "android_client_info": {
+          "package_name": "com.frodo.fighttracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAkiAx79H7UTniYSSoy-raz413iRm2_-jQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
