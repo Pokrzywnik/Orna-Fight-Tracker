@@ -28,6 +28,9 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import android.widget.TimePicker
 import android.app.AlarmManager
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 
 private var isFloatingEnabled = false
 private lateinit var codexFragment: WebFragment
@@ -186,10 +189,14 @@ class MainActivity : AppCompatActivity() {
         }
 
     fun startCapture() {
+        OrnaLauncher.launch(this)
+        Handler(Looper.getMainLooper()).postDelayed({
 
-        captureLauncher.launch(
-            projectionManager.createScreenCaptureIntent()
-        )
+            captureLauncher.launch(
+                projectionManager.createScreenCaptureIntent()
+            )
+
+        }, 600)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -261,6 +268,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
+        windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        windowInsetsController.hide(WindowInsetsCompat.Type.statusBars())
         UpdateChecker.check(this)
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -278,7 +289,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-        super.onCreate(savedInstanceState)
+
         MaterialAlarmScheduler.schedule(this)
         binding = ActivityMainBinding.inflate(layoutInflater)
 
@@ -368,6 +379,8 @@ class MainActivity : AppCompatActivity() {
                 override fun createFragment(position: Int) =
                     fragments[position]
             }
+        binding.viewPager.isUserInputEnabled = true
+        binding.viewPager.offscreenPageLimit = 1
 
         com.google.android.material.tabs.TabLayoutMediator(
             binding.tabLayout,
