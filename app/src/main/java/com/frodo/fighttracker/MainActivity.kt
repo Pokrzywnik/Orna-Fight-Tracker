@@ -204,6 +204,11 @@ class MainActivity : AppCompatActivity() {
 
         setIntent(intent)
 
+        val openTab = intent.getIntExtra("open_tab", -1)
+        if (openTab >= 0) {
+            binding.viewPager.setCurrentItem(openTab, false)
+        }
+
         when (intent.action) {
 
             ACTION_START_TRACKING -> {
@@ -391,7 +396,12 @@ class MainActivity : AppCompatActivity() {
 
         }.attach()
         renderHistory()
-
+        val openTab = intent.getIntExtra("open_tab", -1)
+        if (openTab >= 0) {
+            binding.viewPager.post {
+                binding.viewPager.setCurrentItem(openTab, false)
+            }
+        }
 
     }
 

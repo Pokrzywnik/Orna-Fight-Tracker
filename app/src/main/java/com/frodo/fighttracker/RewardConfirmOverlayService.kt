@@ -62,7 +62,7 @@ class RewardConfirmOverlayService : Service() {
             deny()
         }
 
-        timer = object : CountDownTimer(4000, 1000) {
+        timer = object : CountDownTimer(7000, 1000) {
 
             override fun onTick(millisUntilFinished: Long) {
 

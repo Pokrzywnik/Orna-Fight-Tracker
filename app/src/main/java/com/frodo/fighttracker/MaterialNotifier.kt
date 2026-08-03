@@ -11,6 +11,8 @@ import java.io.InputStreamReader
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
+import android.app.PendingIntent
+import android.content.Intent
 
 object MaterialNotifier {
 
@@ -134,12 +136,30 @@ object MaterialNotifier {
                 }
             }
 
+
+            val openIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP
+
+                putExtra("open_tab", 1)
+            }
+
+            val pendingIntent = PendingIntent.getActivity(
+                context,
+                999,
+                openIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
             val notification =
                 NotificationCompat.Builder(context, CHANNEL_ID)
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
                     .setContentTitle("FightTracker")
                     .setStyle(style)
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setContentIntent(pendingIntent)
+                    .setAutoCancel(true)
                     .build()
 
             val manager =

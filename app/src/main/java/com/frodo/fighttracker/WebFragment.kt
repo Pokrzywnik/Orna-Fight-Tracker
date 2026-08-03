@@ -64,7 +64,94 @@ class WebFragment : Fragment() {
             )
 
         // 3. Configure WebView
-        binding.webView.webViewClient = WebViewClient()
+        binding.webView.webViewClient = object : WebViewClient() {
+
+            override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
+                super.onPageFinished(view, url)
+
+                val inject = Runnable {
+                    view?.evaluateJavascript(
+                        """
+                (function () {
+                
+                    if (window.ftInjected) return;
+                    window.ftInjected = true;
+                
+                    // Main page spacer
+                    if (!document.getElementById('ft-style')) {
+                
+                        const style = document.createElement('style');
+                        style.id = 'ft-style';
+                        style.innerHTML = `
+                            html, body {
+                                padding-bottom: 70px !important;
+                                box-sizing: border-box !important;
+                            }
+                
+                            /* Any fixed bottom drawer / popup */
+                            div.fixed.bottom-0,
+                            div[class*="fixed"][class*="bottom-0"] {
+                                padding-bottom: 100px !important;
+                                box-sizing: border-box !important;
+                            }
+                        `;
+                
+                        document.head.appendChild(style);
+                    }
+                
+                    if (!document.getElementById('ft-spacer')) {
+                
+                        const spacer = document.createElement('div');
+                        spacer.id = 'ft-spacer';
+                        spacer.style.width = '100%';
+                        spacer.style.height = '70px';
+                        spacer.style.pointerEvents = 'none';
+                
+                        document.body.appendChild(spacer);
+                    }
+                
+                    function fixPopups() {
+                
+                        document.querySelectorAll('div.fixed.bottom-0').forEach(function(el){
+                
+                            if (el.dataset.ftDone) return;
+                
+                            el.dataset.ftDone = "1";
+                
+                            el.style.paddingBottom = "100px";
+                            el.style.boxSizing = "border-box";
+                
+                            const spacer = document.createElement("div");
+                            spacer.style.height = "90px";
+                            spacer.style.flexShrink = "0";
+                
+                            el.appendChild(spacer);
+                        });
+                    }
+                
+                    fixPopups();
+                
+                    new MutationObserver(function() {
+                        fixPopups();
+                    }).observe(document.body, {
+                        childList: true,
+                        subtree: true
+                    });
+                
+                })();
+                """.trimIndent(),
+                        null
+                    )
+                }
+
+                if (url?.contains("aussiescodex.com", true) == true) {
+                    // Give React time to finish rendering.
+                    view?.postDelayed(inject, 500)
+                } else {
+                    inject.run()
+                }
+            }
+        }
         binding.webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true

@@ -11,7 +11,7 @@ class FirstRunActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        title = "UPDATE 2.0 🎉"
+        title = "UPDATE 2.5 🎉"
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 40, 20, 40)
@@ -21,9 +21,10 @@ class FirstRunActivity : Activity() {
 
             setText(
                 """
-                • tap to switch between total/per minute overlay
-                • Added HOA towers guild    • better OCR   • new guide below 
-                
+                • Fixed vertical scrolling (buttons covering webviews)
+                • Clicking notification brings user to materials in app
+                • Changed anomaly detection auto-accept timer to higher value 
+                                
                 OCR SETUP GUIDE
                 
                 1. Open orna and get to any rewards screen
@@ -52,8 +53,8 @@ class FirstRunActivity : Activity() {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                val margin = (resources.displayMetrics.widthPixels * 0.15).toInt()
-                setMargins(margin, 20, margin, 20)
+                val margin = (resources.displayMetrics.widthPixels * 0.20).toInt()
+                setMargins(margin, 25, margin, 25)
             }
         }
 
@@ -66,8 +67,9 @@ class FirstRunActivity : Activity() {
         }
 
         layout.addView(textView)
-        layout.addView(image)
         layout.addView(button)
+        layout.addView(image)
+
 
         setContentView(layout)
         window.setLayout(
