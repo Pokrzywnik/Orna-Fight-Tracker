@@ -11,7 +11,7 @@ class FirstRunActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        title = "UPDATE 2.5 🎉"
+        title = "UPDATE 2.6 🎉"
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 40, 20, 40)
