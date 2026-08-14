@@ -13,8 +13,8 @@ android {
         applicationId = "com.frodo.fighttracker"
         minSdk = 26
         targetSdk = 35
-        versionCode = 18
-        versionName = "2.6"
+        versionCode = 19
+        versionName = "2.7"
     }
 
     buildTypes {
@@ -55,4 +55,5 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:34.15.0"))
     implementation("com.google.firebase:firebase-analytics")
     implementation(libs.firebase.crashlytics)
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.21.0")
 }

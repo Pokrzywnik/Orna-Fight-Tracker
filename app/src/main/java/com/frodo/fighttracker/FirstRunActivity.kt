@@ -11,7 +11,7 @@ class FirstRunActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        title = "UPDATE 2.6 🎉"
+        title = "UPDATE 2.7 \uD83D\uDD25"
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 40, 20, 40)
@@ -21,19 +21,19 @@ class FirstRunActivity : Activity() {
 
             setText(
                 """
-                • Fixed vertical scrolling (buttons covering webviews)
-                • Clicking notification brings user to materials in app
-                • Changed anomaly detection auto-accept timer to higher value 
-                                
-                OCR SETUP GUIDE
+                • Added Automatic item Assess + renaming
                 
-                1. Open orna and get to any rewards screen
-                2. Start tracker
-                3. check notifications from fight tracker - click Crop button
-                4. Drag green box over reward area as shown below
-                5. Resize using corners
-                6. Make sure there is space left/right and top border is high
-                7. Press SAVE button (top right)
+                Click play button on bottom right to hide/show floating controller.
+                Use it to start/stop live Assess.
+                Go to item and you will see item qualities
+                Click on overlay to copy Name+ X% to clipboard for renaming
+                
+                If you encounter any bugs - feel free to hit me up on discord - Frodo9382
+                
+                Important note:
+                Assess works only in english for now. Working on other languages.
+                Some items may fail to asses. App try to assess items with adorns, 
+                but not all can provide accurate results.
                 """.trimIndent()
             )
 
@@ -61,14 +61,13 @@ class FirstRunActivity : Activity() {
         val button = Button(this).apply {
             text = "GOT IT"
             setOnClickListener {
-                FirstRunStore.markShown(this@FirstRunActivity)
                 finish()
             }
         }
 
         layout.addView(textView)
         layout.addView(button)
-        layout.addView(image)
+//        layout.addView(image)
 
 
         setContentView(layout)
@@ -76,5 +75,9 @@ class FirstRunActivity : Activity() {
             (resources.displayMetrics.widthPixels * 0.90).toInt(),
             LinearLayout.LayoutParams.WRAP_CONTENT
         )
+    }
+    override fun onStop() {
+        super.onStop()
+        FirstRunStore.markShown(this)
     }
 }

@@ -74,6 +74,25 @@
             android:name=".OcrDebugOverlayService"
             android:exported="false"/>
 
+        <service
+            android:name=".ItemAssessmentService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
+
+        <service
+            android:name=".ItemCaptureService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
+
+        <service
+            android:name=".ItemAssessmentCaptureService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
+
+        <service
+            android:name=".ItemQualityOverlayService"
+            android:exported="false" />
+
         <receiver
             android:name=".MaterialAlarmReceiver"
             android:exported="false" />

@@ -1,3 +1,4 @@
+//12.08.2026 14:17 - ostatnia zmiana przed ruszaniem guzika
 package com.frodo.fighttracker
 
 import android.app.Activity
@@ -28,6 +29,8 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import android.widget.TimePicker
 import android.app.AlarmManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -162,6 +165,9 @@ class MainActivity : AppCompatActivity() {
     companion object {
         const val ACTION_START_TRACKING = "ACTION_START_TRACKING"
         const val ACTION_STOP_TRACKING = "ACTION_STOP_TRACKING"
+
+        const val ACTION_TOGGLE_ITEM_ASSESSMENT =
+            "ACTION_TOGGLE_ITEM_ASSESSMENT"
     }
 
 
@@ -186,6 +192,61 @@ class MainActivity : AppCompatActivity() {
                 startForegroundService(intent)
                 startService(Intent(this, OverlayService::class.java))
             }
+        }
+
+    private val itemScanLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+
+            Log.d(
+                "ITEM_SCAN",
+                "MediaProjection resultCode=${result.resultCode}"
+            )
+
+            Log.d(
+                "ITEM_SCAN",
+                "MediaProjection data=${result.data != null}"
+            )
+
+            if (
+                result.resultCode != Activity.RESULT_OK ||
+                result.data == null
+            ) {
+
+                Log.e(
+                    "ITEM_SCAN",
+                    "MediaProjection permission was not granted"
+                )
+
+                return@registerForActivityResult
+            }
+
+            val intent =
+                Intent(
+                    this,
+                    ItemAssessmentCaptureService::class.java
+                )
+
+            intent.putExtra(
+                ItemAssessmentCaptureService.EXTRA_RESULT_CODE,
+                result.resultCode
+            )
+
+            intent.putExtra(
+                ItemAssessmentCaptureService.EXTRA_DATA,
+                result.data
+            )
+
+            Log.d(
+                "ITEM_SCAN",
+                "Starting ItemAssessmentCaptureService with MediaProjection data"
+            )
+
+            ContextCompat.startForegroundService(
+                this,
+                intent
+            )
         }
 
     fun startCapture() {
@@ -219,7 +280,25 @@ class MainActivity : AppCompatActivity() {
             ACTION_STOP_TRACKING -> {
                 stopTracking()
             }
+
+            FloatingTrackerService.ACTION_START_ITEM_ASSESSMENT -> {
+
+                startItemScan()
+            }
+
         }
+    }
+
+    private fun startItemScan() {
+
+        Log.d(
+            "ITEM_SCAN",
+            "Requesting MediaProjection for item scanner"
+        )
+
+        itemScanLauncher.launch(
+            projectionManager.createScreenCaptureIntent()
+        )
     }
 
     fun stopTracking() {
@@ -299,6 +378,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
 
         setContentView(binding.root)
+        updateFloatingButton()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
 
             if (
@@ -403,11 +483,23 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+//        val pipeline =
+//            ItemAssessmentPipeline(
+//                this@MainActivity
+//            )
+
+//        pipeline.processAllExamples()
     }
 
+
     fun stopFloatingService() {
-        stopService(Intent(this, FloatingTrackerService::class.java))
-        stopService(Intent(this, OverlayService::class.java))
+
+        stopService(
+            Intent(
+                this,
+                FloatingTrackerService::class.java
+            )
+        )
     }
 
     fun getCodexUrl(): String {
@@ -418,6 +510,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun updateFloatingButton() {
+
+        if (FloatingTrackerService.isRunning) {
+
+            binding.fabFloatingToggle.setImageResource(
+                android.R.drawable.ic_media_pause
+            )
+
+        } else {
+
+            binding.fabFloatingToggle.setImageResource(
+                android.R.drawable.ic_media_play
+            )
+        }
+    }
     private fun renderHistory() {
 
 
@@ -707,7 +814,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun startFloatingService() {
-        startService(Intent(this, FloatingTrackerService::class.java))
-        startService(Intent(this, OverlayService::class.java))
+
+        startService(
+            Intent(
+                this,
+                FloatingTrackerService::class.java
+            )
+        )
     }
 }
