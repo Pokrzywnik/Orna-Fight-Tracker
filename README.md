@@ -64,11 +64,10 @@ Uses:
 
 ## Floating Tracker Overlay
 
-Includes a floating overlay tracker that can:
+Includes a floating overlay tracker that:
 
-* Start/stop tracking quickly
 * Stay visible above Orna
-* Reduce the need to reopen the app
+* shows Last Reward/Total/Averange per minute orns, gold, xp and shards
 
 Requires:
 
