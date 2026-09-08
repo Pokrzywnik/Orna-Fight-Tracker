@@ -33,7 +33,7 @@ The app uses Android MediaProjection + ML Kit OCR to detect rewards/assess items
 
 # Features
 ## OCR Live Item Assess
-FightTracker scans the screen using Android MediaProjection and:
+FightTracker scans the screen using paddle paddle OCR and:
 
 * Detects Item screen
 * Assess item showing overlay
