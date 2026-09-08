@@ -92,10 +92,12 @@ Sources include:
 * Sparring
 * Trials
 * Towers
+* Towers (HoA)
 
 Users can:
 
 * Select targeted materials
+* select/deselect guilds to use
 * Highlight tracked materials with animated aura effects
 * Receive daily notifications if selected materials are available
 
@@ -194,6 +196,7 @@ The app uses the following permissions:
 * Android 10+
 * Notification permission
 * Overlay permission
+* Disabled battery optimalization (for longer sessions)
 
 ## Build
 
@@ -207,7 +210,15 @@ Open in Android Studio and run:
 
 # Credits
 
-Forecast data provided by:
+**Monuments rewards** - https://floorchart.top/ by Mr Truffles  (dethplaque on discord)
+
+**Aussie Codex** - https://www.aussiescodex.com/ by AussiePlz (biscuitman on discord)
+
+**Yaco Codex** - https://codex.fqegg.top/ by FQEGG (fqegg on discord)
+
+<br>
+
+**Forecast data provided by:**
 
 ## Data Entry
 
@@ -246,12 +257,7 @@ Forecast data provided by:
 * zexterior — Omnicracy
 
 Original spreadsheet:
-
 [https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaOAi8/edit?gid=1635134007#gid=1635134007](https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaOAi8/edit?gid=1635134007#gid=1635134007)
-
-**Monuments rewards - https://floorchart.top/ by Mr Truffles  (dethplaque on discrod) 
-Aussie Codex - https://www.aussiescodex.com/ by AussiePlz (biscuitman on discord)
-Yaco Codex - https://codex.fqegg.top/ by FQEGG (fqegg on discord)**
 
 ---
 
