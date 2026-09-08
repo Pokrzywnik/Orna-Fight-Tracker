@@ -62,6 +62,7 @@
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
 
+
         <service
             android:name=".OverlayService"
             android:exported="false"/>
@@ -77,21 +78,25 @@
         <service
             android:name=".ItemAssessmentService"
             android:exported="false"
-            android:foregroundServiceType="mediaProjection" />
+            android:foregroundServiceType="mediaProjection"
+            android:stopWithTask="true"/>
 
         <service
             android:name=".ItemCaptureService"
             android:exported="false"
-            android:foregroundServiceType="mediaProjection" />
+            android:foregroundServiceType="mediaProjection"
+            android:stopWithTask="true"/>
 
         <service
             android:name=".ItemAssessmentCaptureService"
             android:exported="false"
-            android:foregroundServiceType="mediaProjection" />
+            android:foregroundServiceType="mediaProjection"
+            android:stopWithTask="true"/>
 
         <service
             android:name=".ItemQualityOverlayService"
-            android:exported="false" />
+            android:exported="false"
+            android:stopWithTask="true"/>
 
         <receiver
             android:name=".MaterialAlarmReceiver"

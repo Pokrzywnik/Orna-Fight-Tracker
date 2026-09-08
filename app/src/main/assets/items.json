@@ -373,7 +373,7 @@
         "1%"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+7%"
       ],
       [
@@ -21678,7 +21678,7 @@
         "1%"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+4%"
       ],
       [
@@ -21779,7 +21779,7 @@
         "1%"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+4%"
       ],
       [
@@ -21880,7 +21880,7 @@
         "1%"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+4%"
       ],
       [
@@ -29162,7 +29162,7 @@
         "52"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+2%"
       ],
       [
@@ -29259,7 +29259,7 @@
         "52"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+8%"
       ],
       [
@@ -29348,7 +29348,7 @@
         "52"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+2%"
       ],
       [
@@ -29445,7 +29445,7 @@
         "52"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+8%"
       ],
       [
@@ -29534,7 +29534,7 @@
         "52"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+2%"
       ],
       [
@@ -29631,7 +29631,7 @@
         "52"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+8%"
       ],
       [
@@ -30823,7 +30823,7 @@
     "category": "Items",
     "id": "arisen-rift-summoner-boots",
     "name": "Arisen Rift Summoner Boots",
-    "icon": "/img/armor/rift_summoner_boots_arisen.png",
+    "icon": "/img/armor/charon_boots_arisen.png",
     "aura": "rare",
     "description": "A piece of Judge's attire worn by Charon. When standing strong with these boots, your summons will be slightly stronger.",
     "exotic": "Exotic",
@@ -30904,7 +30904,7 @@
     "category": "Items",
     "id": "arisen-rift-summoner-helmet",
     "name": "Arisen Rift Summoner Helmet",
-    "icon": "/img/armor/rift_summoner_helmet_arisen.png",
+    "icon": "/img/armor/charon_helmet_arisen.png",
     "aura": "rare",
     "description": "A piece of Judge's attire worn by Charon. When wearing this helmet, using pacts with your summons will be more effective.",
     "exotic": "Exotic",
@@ -30940,7 +30940,7 @@
         "1%"
       ],
       [
-        "Summon Pacts",
+        "Summon Pact Power",
         "+40%"
       ],
       [
@@ -30980,7 +30980,7 @@
     "category": "Items",
     "id": "arisen-rift-summoner-plate",
     "name": "Arisen Rift Summoner Plate",
-    "icon": "/img/armor/rift_summoner_plate_arisen.png",
+    "icon": "/img/armor/charon_plate_arisen.png",
     "aura": "rare",
     "description": "A piece of Judge's attire worn by Charon. When wearing this armor, your summons will be more likely to protect you.",
     "exotic": "Exotic",
@@ -31056,7 +31056,7 @@
     "category": "Items",
     "id": "arisen-riftguard-armor",
     "name": "Arisen Riftguard Armor",
-    "icon": "/img/armor/riftguard_armor_arisen.png",
+    "icon": "/img/armor/rhada_armor_arisen.png",
     "aura": "rare",
     "description": "A piece of Judge's attire worn by Rhada. When taking Ward damage while wearing this armor, one will take reduced self damage from status effects.",
     "exotic": "Exotic",
@@ -31136,7 +31136,7 @@
     "category": "Items",
     "id": "arisen-riftguard-helmet",
     "name": "Arisen Riftguard Helmet",
-    "icon": "/img/armor/riftguard_helmet_arisen.png",
+    "icon": "/img/armor/rhada_helmet_arisen.png",
     "aura": "rare",
     "description": "A piece of Judge's attire worn by Rhada. When taking Ward damage while wearing this armor, HP and Mana will be recovered by a percentage of the Ward damage taken.",
     "exotic": "Exotic",
@@ -31220,7 +31220,7 @@
     "category": "Items",
     "id": "arisen-riftguard-leggings",
     "name": "Arisen Riftguard Leggings",
-    "icon": "/img/armor/riftguard_leggings_arisen.png",
+    "icon": "/img/armor/rhada_leggings_arisen.png",
     "aura": "rare",
     "description": "A piece of Judge's attire worn by Rhada. When taking Ward damage while wearing this armor, HP and Mana will be recovered by a percentage of the Ward damage taken.",
     "exotic": "Exotic",
@@ -31389,7 +31389,7 @@
     "category": "Items",
     "id": "arisen-riftrogue-boots",
     "name": "Arisen Riftrogue Boots",
-    "icon": "/img/armor/riftrogue_boots_arisen.png",
+    "icon": "/img/armor/achlys_boots_arisen.png",
     "aura": "rare",
     "description": "A piece of Judge's attire worn by Achlys. One may move with extra grace when wearing this armor, decreasing your chance to miss your mark.",
     "exotic": "Exotic",
@@ -31473,7 +31473,7 @@
     "category": "Items",
     "id": "arisen-riftrogue-chestplate",
     "name": "Arisen Riftrogue Chestplate",
-    "icon": "/img/armor/riftrogue_chestplate_arisen.png",
+    "icon": "/img/armor/achlys_chestplate_arisen.png",
     "aura": "rare",
     "description": "A piece of Judge's attire worn by Achlys. One may move with extra grace when wearing this armor, decreasing your chance to miss your mark.",
     "exotic": "Exotic",
@@ -31557,7 +31557,7 @@
     "category": "Items",
     "id": "arisen-riftrogue-helmet",
     "name": "Arisen Riftrogue Helmet",
-    "icon": "/img/armor/riftrogue_helmet_arisen.png",
+    "icon": "/img/armor/achlys_helmet_arisen.png",
     "aura": "rare",
     "description": "A piece of Judge's attire worn by Achlys. One may move with extra grace when wearing this armor, decreasing your chance to miss your mark.",
     "exotic": "Exotic",
@@ -35548,7 +35548,7 @@
         "-60"
       ],
       [
-        "Summon Pacts",
+        "Summon Pact Power",
         "+20%"
       ]
     ],
@@ -45029,7 +45029,7 @@
         "+3%"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+0.5%"
       ]
     ],
@@ -69032,7 +69032,7 @@
         "+5%"
       ],
       [
-        "Summon Pacts",
+        "Summon Pact Power",
         "+5%"
       ],
       [
@@ -69044,7 +69044,7 @@
         "+5%"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+5%"
       ],
       [
@@ -70104,124 +70104,6 @@
     "category": "Items",
     "id": "cursed-fomoria-plated-robe",
     "name": "Cursed Fomoria Plated Robe",
-    "icon": "/img/armor/fomor_chest_sumner.png",
-    "aura": "rare",
-    "description": "Mail of Fomor, Cursed King of Fomoria. This item grants a number of passive abilities known to be utilized by the Fomorian houses.",
-    "exotic": "Exotic",
-    "meta": [
-      [
-        "Tier",
-        "★8"
-      ],
-      [
-        "Rarity",
-        "Rare"
-      ],
-      [
-        "Useable by",
-        "Warrior classes"
-      ],
-      [
-        "Place",
-        "Torso"
-      ]
-    ],
-    "stats": [
-      [
-        "Defense",
-        "190"
-      ],
-      [
-        "Resistance",
-        "-160"
-      ],
-      [
-        "Multi-target Damage",
-        "+5%"
-      ],
-      [
-        "Chain Damage Chance",
-        "+5%"
-      ],
-      [
-        "Buff Duration",
-        "+5%"
-      ],
-      [
-        "Ally Effect Chance",
-        "+5%"
-      ],
-      [
-        "Effect Damage",
-        "+25%"
-      ],
-      [
-        "Status Effect Chance",
-        "+21%"
-      ],
-      [
-        "Status Effect Duration",
-        "+1 turn"
-      ],
-      [
-        "Summon Stats",
-        "+8%"
-      ],
-      [
-        "Follower Stats",
-        "+8%"
-      ],
-      [
-        "Follower/Summon Damage Taken",
-        "-10%"
-      ],
-      [
-        "Adornment Slots",
-        "4"
-      ]
-    ],
-    "drops": [
-      [
-        "Dropped by",
-        [
-          {
-            "name": "Cursed King Fomor, Sumner",
-            "icon": "/img/bosses/fomoria/fomor_sumner_cursed.png",
-            "href": "/codex/bosses/cursed-king-fomor-sumner/"
-          }
-        ]
-      ],
-      [
-        "Upgrade materials",
-        [
-          {
-            "name": "Silver",
-            "icon": "/img/materials/silver.png",
-            "href": "/codex/items/silver/"
-          },
-          {
-            "name": "Mythril",
-            "icon": "/img/materials/mythril.png",
-            "href": "/codex/items/mythril/"
-          },
-          {
-            "name": "Bone",
-            "icon": "/img/materials/bone.png",
-            "href": "/codex/items/bone/"
-          },
-          {
-            "name": "Silk",
-            "icon": "/img/materials/silk.png",
-            "href": "/codex/items/silk/"
-          }
-        ]
-      ]
-    ]
-  },
-  {
-    "category": "Items",
-    "id": "cursed-fomoria-plated-robe-49122feb",
-    "name": "Cursed Fomoria Plated Robe",
     "icon": "/img/armor/fomor_chest_wintara.png",
     "aura": "rare",
     "description": "Mail of Fomor, Cursed King of Fomoria. This item grants a number of passive abilities known to be utilized by the Fomorian houses.",
@@ -70306,6 +70188,124 @@
             "name": "Cursed King Fomor, Wintara",
             "icon": "/img/bosses/fomoria/fomor_wintara_cursed.png",
             "href": "/codex/bosses/cursed-king-fomor-wintara/"
+          }
+        ]
+      ],
+      [
+        "Upgrade materials",
+        [
+          {
+            "name": "Silver",
+            "icon": "/img/materials/silver.png",
+            "href": "/codex/items/silver/"
+          },
+          {
+            "name": "Mythril",
+            "icon": "/img/materials/mythril.png",
+            "href": "/codex/items/mythril/"
+          },
+          {
+            "name": "Bone",
+            "icon": "/img/materials/bone.png",
+            "href": "/codex/items/bone/"
+          },
+          {
+            "name": "Silk",
+            "icon": "/img/materials/silk.png",
+            "href": "/codex/items/silk/"
+          }
+        ]
+      ]
+    ]
+  },
+  {
+    "category": "Items",
+    "id": "cursed-fomoria-plated-robe-5d09a4d7",
+    "name": "Cursed Fomoria Plated Robe",
+    "icon": "/img/armor/fomor_chest_sumner.png",
+    "aura": "rare",
+    "description": "Mail of Fomor, Cursed King of Fomoria. This item grants a number of passive abilities known to be utilized by the Fomorian houses.",
+    "exotic": "Exotic",
+    "meta": [
+      [
+        "Tier",
+        "★8"
+      ],
+      [
+        "Rarity",
+        "Rare"
+      ],
+      [
+        "Useable by",
+        "Warrior classes"
+      ],
+      [
+        "Place",
+        "Torso"
+      ]
+    ],
+    "stats": [
+      [
+        "Defense",
+        "190"
+      ],
+      [
+        "Resistance",
+        "-160"
+      ],
+      [
+        "Multi-target Damage",
+        "+5%"
+      ],
+      [
+        "Chain Damage Chance",
+        "+5%"
+      ],
+      [
+        "Buff Duration",
+        "+5%"
+      ],
+      [
+        "Ally Effect Chance",
+        "+5%"
+      ],
+      [
+        "Effect Damage",
+        "+25%"
+      ],
+      [
+        "Status Effect Chance",
+        "+21%"
+      ],
+      [
+        "Status Effect Duration",
+        "+1 turn"
+      ],
+      [
+        "Summon Stats",
+        "+8%"
+      ],
+      [
+        "Follower Stats",
+        "+8%"
+      ],
+      [
+        "Follower/Summon Damage Taken",
+        "-10%"
+      ],
+      [
+        "Adornment Slots",
+        "4"
+      ]
+    ],
+    "drops": [
+      [
+        "Dropped by",
+        [
+          {
+            "name": "Cursed King Fomor, Sumner",
+            "icon": "/img/bosses/fomoria/fomor_sumner_cursed.png",
+            "href": "/codex/bosses/cursed-king-fomor-sumner/"
           }
         ]
       ],
@@ -77141,11 +77141,46 @@
   },
   {
     "category": "Items",
+    "id": "darkrift-crucible",
+    "name": "Darkrift Crucible",
+    "icon": "/img/useables/judges_crucible.png",
+    "aura": "legendary",
+    "description": "A crucible used to seal the Dark Rift. Use it upon an Anguished item to receive a bonus unique to this item.",
+    "exotic": "Exotic",
+    "meta": [
+      [
+        "Tier",
+        "★10"
+      ],
+      [
+        "Rarity",
+        "Legendary"
+      ],
+      [
+        "Useable by",
+        "All classes"
+      ]
+    ],
+    "drops": [
+      [
+        "Dropped by",
+        [
+          {
+            "name": "Fallen Judge Zagreus",
+            "icon": "/img/bosses/zagreus.png",
+            "href": "/codex/bosses/fallen-judge-zagreus/"
+          }
+        ]
+      ]
+    ]
+  },
+  {
+    "category": "Items",
     "id": "darkrift-dungeon-key",
     "name": "Darkrift Dungeon Key",
     "icon": "/img/useables/darkrift_key.png",
     "aura": "legendary",
-    "description": "A key that can allow one to run any Dungeon as a \"Darkrift Dungeon\" during the Riftfall event.",
+    "description": "A key that allows one to enter a Darkrift Dungeon during the Riftfall world event.",
     "meta": [
       [
         "Tier",
@@ -78988,7 +79023,7 @@
     "category": "Items",
     "id": "delta-achlys-riftlock-fragment",
     "name": "Delta Achlys Riftlock Fragment",
-    "icon": "/img/useables/riftlock1.png",
+    "icon": "/img/useables/riftlock1_fragment.png",
     "aura": "common",
     "description": "Riftlock of Achlys, the Red Dagger.",
     "exotic": "Exotic",
@@ -79051,7 +79086,7 @@
     "category": "Items",
     "id": "delta-charon-riftlock-fragment",
     "name": "Delta Charon Riftlock Fragment",
-    "icon": "/img/useables/riftlock5.png",
+    "icon": "/img/useables/riftlock5_fragment.png",
     "aura": "common",
     "description": "Riftlock of Charon, the Grand Summoner.",
     "exotic": "Exotic",
@@ -80850,7 +80885,7 @@
     "category": "Items",
     "id": "delta-rhada-riftlock-fragment",
     "name": "Delta Rhada Riftlock Fragment",
-    "icon": "/img/useables/riftlock3.png",
+    "icon": "/img/useables/riftlock3_fragment.png",
     "aura": "common",
     "description": "Riftlock of Rhada, the Great Shield.",
     "exotic": "Exotic",
@@ -105297,7 +105332,7 @@
         "22%"
       ],
       [
-        "Summon Pacts",
+        "Summon Pact Power",
         "+60%"
       ],
       [
@@ -111214,7 +111249,7 @@
         "+25%"
       ],
       [
-        "Summon Pacts",
+        "Summon Pact Power",
         "+20%"
       ]
     ],
@@ -118072,7 +118107,7 @@
         "12"
       ],
       [
-        "Summon Pacts",
+        "Summon Pact Power",
         "+20%"
       ]
     ],
@@ -119004,7 +119039,7 @@
         "45"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+4%"
       ],
       [
@@ -119090,7 +119125,7 @@
         "45"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+4%"
       ],
       [
@@ -119176,7 +119211,7 @@
         "45"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+4%"
       ],
       [
@@ -135482,6 +135517,996 @@
   },
   {
     "category": "Items",
+    "id": "judge-trifecta-armor",
+    "name": "Judge Trifecta Armor",
+    "icon": "/img/armor/trifecta_warrior_chest.png",
+    "aura": "rare",
+    "description": "Heavy armor of the Judge Trifecta Maximus. When wearing this armor, you will begin battle with both additional Ward turns and Ward absorption.",
+    "exotic": "Exotic",
+    "meta": [
+      [
+        "Tier",
+        "★10"
+      ],
+      [
+        "Rarity",
+        "Rare"
+      ],
+      [
+        "Useable by",
+        "Warrior classes"
+      ],
+      [
+        "Place",
+        "Torso"
+      ]
+    ],
+    "stats": [
+      [
+        "Defense",
+        "305"
+      ],
+      [
+        "Ward",
+        "8%"
+      ],
+      [
+        "Ward Start",
+        "+1 turns"
+      ],
+      [
+        "Ward Absorption",
+        "+10%"
+      ],
+      [
+        "Adornment Slots",
+        "5"
+      ]
+    ],
+    "drops": [
+      [
+        "Dropped by",
+        [
+          {
+            "name": "Judge Trifecta Maximus",
+            "icon": "/img/bosses/judge_trifecta.png",
+            "href": "/codex/raids/judge-trifecta-maximus/"
+          }
+        ]
+      ],
+      [
+        "Upgrade materials",
+        [
+          {
+            "name": "Titanium",
+            "icon": "/img/materials/titanium.png",
+            "href": "/codex/items/titanium/"
+          },
+          {
+            "name": "Fogstone",
+            "icon": "/img/materials/fogstone.png",
+            "href": "/codex/items/fogstone/"
+          }
+        ]
+      ]
+    ]
+  },
+  {
+    "category": "Items",
+    "id": "judge-trifecta-boots",
+    "name": "Judge Trifecta Boots",
+    "icon": "/img/armor/trifecta_thief_legs.png",
+    "aura": "rare",
+    "description": "Light armor of the Judge Trifecta Maximus. When wearing this armor, the maximum Avidity that one may possess is increased.",
+    "exotic": "Exotic",
+    "meta": [
+      [
+        "Tier",
+        "★10"
+      ],
+      [
+        "Rarity",
+        "Rare"
+      ],
+      [
+        "Useable by",
+        "Thief classes"
+      ],
+      [
+        "Place",
+        "Legs"
+      ]
+    ],
+    "stats": [
+      [
+        "Defense",
+        "305"
+      ],
+      [
+        "Resistance",
+        "100"
+      ],
+      [
+        "Dexterity",
+        "75"
+      ],
+      [
+        "Ward",
+        "2%"
+      ],
+      [
+        "Max Avidity",
+        "+7%"
+      ],
+      [
+        "Avidity Chance",
+        "+5%"
+      ],
+      [
+        "Adornment Slots",
+        "5"
+      ]
+    ],
+    "drops": [
+      [
+        "Dropped by",
+        [
+          {
+            "name": "Judge Trifecta Maximus",
+            "icon": "/img/bosses/judge_trifecta.png",
+            "href": "/codex/raids/judge-trifecta-maximus/"
+          }
+        ]
+      ],
+      [
+        "Upgrade materials",
+        [
+          {
+            "name": "Titanium",
+            "icon": "/img/materials/titanium.png",
+            "href": "/codex/items/titanium/"
+          },
+          {
+            "name": "Fogstone",
+            "icon": "/img/materials/fogstone.png",
+            "href": "/codex/items/fogstone/"
+          }
+        ]
+      ]
+    ]
+  },
+  {
+    "category": "Items",
+    "id": "judge-trifecta-chestplate",
+    "name": "Judge Trifecta Chestplate",
+    "icon": "/img/armor/trifecta_thief_chest.png",
+    "aura": "rare",
+    "description": "Light armor of the Judge Trifecta Maximus. When wearing this armor, the maximum Avidity that one may possess is increased.",
+    "exotic": "Exotic",
+    "meta": [
+      [
+        "Tier",
+        "★10"
+      ],
+      [
+        "Rarity",
+        "Rare"
+      ],
+      [
+        "Useable by",
+        "Thief classes"
+      ],
+      [
+        "Place",
+        "Torso"
+      ]
+    ],
+    "stats": [
+      [
+        "Defense",
+        "305"
+      ],
+      [
+        "Resistance",
+        "100"
+      ],
+      [
+        "Dexterity",
+        "75"
+      ],
+      [
+        "Ward",
+        "2%"
+      ],
+      [
+        "Max Avidity",
+        "+7%"
+      ],
+      [
+        "Avidity Chance",
+        "+5%"
+      ],
+      [
+        "Adornment Slots",
+        "5"
+      ]
+    ],
+    "drops": [
+      [
+        "Dropped by",
+        [
+          {
+            "name": "Judge Trifecta Maximus",
+            "icon": "/img/bosses/judge_trifecta.png",
+            "href": "/codex/raids/judge-trifecta-maximus/"
+          }
+        ]
+      ],
+      [
+        "Upgrade materials",
+        [
+          {
+            "name": "Titanium",
+            "icon": "/img/materials/titanium.png",
+            "href": "/codex/items/titanium/"
+          },
+          {
+            "name": "Fogstone",
+            "icon": "/img/materials/fogstone.png",
+            "href": "/codex/items/fogstone/"
+          }
+        ]
+      ]
+    ]
+  },
+  {
+    "category": "Items",
+    "id": "judge-trifecta-falx",
+    "name": "Judge Trifecta Falx",
+    "icon": "/img/weapons/trifecta_falx.png",
+    "aura": "famed",
+    "description": "A long, thin blade carried by the Judge Trifecta Maximus. When landing critical strikes with this sword, the chance of gaining an additional turn through Avidity is increased.",
+    "exotic": "Exotic",
+    "meta": [
+      [
+        "Tier",
+        "★10"
+      ],
+      [
+        "Rarity",
+        "Famed"
+      ],
+      [
+        "Useable by",
+        "Thief classes"
+      ],
+      [
+        "Place",
+        "Weapon"
+      ],
+      [
+        "Type",
+        "Curved swords"
+      ]
+    ],
+    "stats": [
+      [
+        "Attack",
+        "305"
+      ],
+      [
+        "Dexterity",
+        "60"
+      ],
+      [
+        "Ward",
+        "2%"
+      ],
+      [
+        "Crit Chain → Avidity Chance",
+        "+2%"
+      ],
+      [
+        "Critical Chain",
+        "+3%"
+      ],
+      [
+        "Adornment Slots",
+        "6"
+      ]
+    ],
+    "drops": [
+      [
+        "Dropped by",
+        [
+          {
+            "name": "Judge Trifecta Maximus",
+            "icon": "/img/bosses/judge_trifecta.png",
+            "href": "/codex/raids/judge-trifecta-maximus/"
+          }
+        ]
+      ],
+      [
+        "Upgrade materials",
+        [
+          {
+            "name": "Mythril",
+            "icon": "/img/materials/mythril.png",
+            "href": "/codex/items/mythril/"
+          },
+          {
+            "name": "Wood",
+            "icon": "/img/materials/wood.png",
+            "href": "/codex/items/wood/"
+          },
+          {
+            "name": "Silk",
+            "icon": "/img/materials/silk.png",
+            "href": "/codex/items/silk/"
+          }
+        ]
+      ]
+    ]
+  },
+  {
+    "category": "Items",
+    "id": "judge-trifecta-greatsword",
+    "name": "Judge Trifecta Greatsword",
+    "icon": "/img/weapons/trifecta_greatsword.png",
+    "aura": "famed",
+    "description": "Greatsword of the Judge Trifecta Maximus. When holding this sword and using skills that consume Ward, the chance and damage dealt of Collateral Damage will be increased.",
+    "exotic": "Exotic",
+    "meta": [
+      [
+        "Tier",
+        "★10"
+      ],
+      [
+        "Rarity",
+        "Famed"
+      ],
+      [
+        "Useable by",
+        "Warrior classes"
+      ],
+      [
+        "Place",
+        "Weapon"
+      ],
+      [
+        "Type",
+        "Swords"
+      ]
+    ],
+    "stats": [
+      [
+        "Attack",
+        "305"
+      ],
+      [
+        "Defense",
+        "20"
+      ],
+      [
+        "Ward",
+        "2%"
+      ],
+      [
+        "Ward Power → Collateral Damage",
+        "+15%"
+      ],
+      [
+        "Adornment Slots",
+        "5"
+      ]
+    ],
+    "drops": [
+      [
+        "Dropped by",
+        [
+          {
+            "name": "Judge Trifecta Maximus",
+            "icon": "/img/bosses/judge_trifecta.png",
+            "href": "/codex/raids/judge-trifecta-maximus/"
+          }
+        ]
+      ],
+      [
+        "Upgrade materials",
+        [
+          {
+            "name": "Hardened Steel",
+            "icon": "/img/materials/hardened_steel.png",
+            "href": "/codex/items/hardened-steel/"
+          },
+          {
+            "name": "Wood",
+            "icon": "/img/materials/wood.png",
+            "href": "/codex/items/wood/"
+          },
+          {
+            "name": "Stone",
+            "icon": "/img/materials/stone.png",
+            "href": "/codex/items/stone/"
+          }
+        ]
+      ]
+    ]
+  },
+  {
+    "category": "Items",
+    "id": "judge-trifecta-grimoire",
+    "name": "Judge Trifecta Grimoire",
+    "icon": "/img/wards/trifecta_grimoire.png",
+    "aura": "legendary",
+    "description": "A massive tome carried by the Judge Trifecta Maximus. The tome grants one the ability to summon shades of the Judges into battle.",
+    "exotic": "Exotic",
+    "meta": [
+      [
+        "Tier",
+        "★10"
+      ],
+      [
+        "Rarity",
+        "Legendary"
+      ],
+      [
+        "Useable by",
+        "Valhallan/Summoner classes"
+      ],
+      [
+        "Place",
+        "Off-hand"
+      ]
+    ],
+    "stats": [
+      [
+        "Magic",
+        "35"
+      ],
+      [
+        "Resistance",
+        "96"
+      ],
+      [
+        "Ward",
+        "28%"
+      ],
+      [
+        "Summon Stats",
+        "+10%"
+      ],
+      [
+        "Disperse Status Effect Chance",
+        "+20%"
+      ],
+      [
+        "Adornment Slots",
+        "2"
+      ]
+    ],
+    "ability": [
+      "Summon Judges",
+      "Summon shades of Elysian Judges to assist you. Requires 2 turns in battle."
+    ],
+    "drops": [
+      [
+        "Dropped by",
+        [
+          {
+            "name": "Judge Trifecta Maximus",
+            "icon": "/img/bosses/judge_trifecta.png",
+            "href": "/codex/raids/judge-trifecta-maximus/"
+          }
+        ]
+      ],
+      [
+        "Upgrade materials",
+        [
+          {
+            "name": "Perfect Runestone",
+            "icon": "/img/materials/perfect_runestone.png",
+            "href": "/codex/items/perfect-runestone/"
+          },
+          {
+            "name": "Greater Soul",
+            "icon": "/img/materials/greater_soul.png",
+            "href": "/codex/items/greater-soul/"
+          }
+        ]
+      ]
+    ]
+  },
+  {
+    "category": "Items",
+    "id": "judge-trifecta-headguard",
+    "name": "Judge Trifecta Headguard",
+    "icon": "/img/armor/trifecta_summoner_helm.png",
+    "aura": "rare",
+    "description": "Light armor of the Judge Trifecta Maximus. The chance to automatically summon through Charon Ritual will be increased.",
+    "exotic": "Exotic",
+    "meta": [
+      [
+        "Tier",
+        "★10"
+      ],
+      [
+        "Rarity",
+        "Rare"
+      ],
+      [
+        "Useable by",
+        "Valhallan/Summoner classes"
+      ],
+      [
+        "Place",
+        "Head"
+      ]
+    ],
+    "stats": [
+      [
+        "Defense",
+        "60"
+      ],
+      [
+        "Resistance",
+        "305"
+      ],
+      [
+        "Dexterity",
+        "60"
+      ],
+      [
+        "Ward",
+        "2%"
+      ],
+      [
+        "Charon Ritual Chance",
+        "+7%"
+      ],
+      [
+        "Summon Stats",
+        "-15.0%"
+      ],
+      [
+        "Adornment Slots",
+        "5"
+      ]
+    ],
+    "drops": [
+      [
+        "Dropped by",
+        [
+          {
+            "name": "Judge Trifecta Maximus",
+            "icon": "/img/bosses/judge_trifecta.png",
+            "href": "/codex/raids/judge-trifecta-maximus/"
+          }
+        ]
+      ],
+      [
+        "Upgrade materials",
+        [
+          {
+            "name": "Titanium",
+            "icon": "/img/materials/titanium.png",
+            "href": "/codex/items/titanium/"
+          },
+          {
+            "name": "Fogstone",
+            "icon": "/img/materials/fogstone.png",
+            "href": "/codex/items/fogstone/"
+          }
+        ]
+      ]
+    ]
+  },
+  {
+    "category": "Items",
+    "id": "judge-trifecta-helmet",
+    "name": "Judge Trifecta Helmet",
+    "icon": "/img/armor/trifecta_warrior_helm.png",
+    "aura": "rare",
+    "description": "Heavy armor of the Judge Trifecta Maximus. When wearing this armor, you will begin battle with both additional Ward turns and Ward absorption.",
+    "exotic": "Exotic",
+    "meta": [
+      [
+        "Tier",
+        "★10"
+      ],
+      [
+        "Rarity",
+        "Rare"
+      ],
+      [
+        "Useable by",
+        "Warrior classes"
+      ],
+      [
+        "Place",
+        "Head"
+      ]
+    ],
+    "stats": [
+      [
+        "Defense",
+        "305"
+      ],
+      [
+        "Ward",
+        "8%"
+      ],
+      [
+        "Ward Start",
+        "+1 turns"
+      ],
+      [
+        "Ward Absorption",
+        "+10%"
+      ],
+      [
+        "Adornment Slots",
+        "5"
+      ]
+    ],
+    "drops": [
+      [
+        "Dropped by",
+        [
+          {
+            "name": "Judge Trifecta Maximus",
+            "icon": "/img/bosses/judge_trifecta.png",
+            "href": "/codex/raids/judge-trifecta-maximus/"
+          }
+        ]
+      ],
+      [
+        "Upgrade materials",
+        [
+          {
+            "name": "Titanium",
+            "icon": "/img/materials/titanium.png",
+            "href": "/codex/items/titanium/"
+          },
+          {
+            "name": "Fogstone",
+            "icon": "/img/materials/fogstone.png",
+            "href": "/codex/items/fogstone/"
+          }
+        ]
+      ]
+    ]
+  },
+  {
+    "category": "Items",
+    "id": "judge-trifecta-leggings",
+    "name": "Judge Trifecta Leggings",
+    "icon": "/img/armor/trifecta_warrior_legs.png",
+    "aura": "rare",
+    "description": "Heavy armor of the Judge Trifecta Maximus. When wearing this armor, you will begin battle with both additional Ward turns and Ward absorption.",
+    "exotic": "Exotic",
+    "meta": [
+      [
+        "Tier",
+        "★10"
+      ],
+      [
+        "Rarity",
+        "Rare"
+      ],
+      [
+        "Useable by",
+        "Warrior classes"
+      ],
+      [
+        "Place",
+        "Legs"
+      ]
+    ],
+    "stats": [
+      [
+        "Defense",
+        "305"
+      ],
+      [
+        "Ward",
+        "8%"
+      ],
+      [
+        "Ward Start",
+        "+1 turns"
+      ],
+      [
+        "Ward Absorption",
+        "+10%"
+      ],
+      [
+        "Adornment Slots",
+        "5"
+      ]
+    ],
+    "drops": [
+      [
+        "Dropped by",
+        [
+          {
+            "name": "Judge Trifecta Maximus",
+            "icon": "/img/bosses/judge_trifecta.png",
+            "href": "/codex/raids/judge-trifecta-maximus/"
+          }
+        ]
+      ],
+      [
+        "Upgrade materials",
+        [
+          {
+            "name": "Titanium",
+            "icon": "/img/materials/titanium.png",
+            "href": "/codex/items/titanium/"
+          },
+          {
+            "name": "Fogstone",
+            "icon": "/img/materials/fogstone.png",
+            "href": "/codex/items/fogstone/"
+          }
+        ]
+      ]
+    ]
+  },
+  {
+    "category": "Items",
+    "id": "judge-trifecta-legguards",
+    "name": "Judge Trifecta Legguards",
+    "icon": "/img/armor/trifecta_summoner_legs.png",
+    "aura": "rare",
+    "description": "Light armor of the Judge Trifecta Maximus. The chance to automatically summon through Charon Ritual will be increased.",
+    "exotic": "Exotic",
+    "meta": [
+      [
+        "Tier",
+        "★10"
+      ],
+      [
+        "Rarity",
+        "Rare"
+      ],
+      [
+        "Useable by",
+        "Valhallan/Summoner classes"
+      ],
+      [
+        "Place",
+        "Legs"
+      ]
+    ],
+    "stats": [
+      [
+        "Defense",
+        "60"
+      ],
+      [
+        "Resistance",
+        "305"
+      ],
+      [
+        "Dexterity",
+        "60"
+      ],
+      [
+        "Ward",
+        "2%"
+      ],
+      [
+        "Charon Ritual Chance",
+        "+7%"
+      ],
+      [
+        "Summon Stats",
+        "-15.0%"
+      ],
+      [
+        "Adornment Slots",
+        "5"
+      ]
+    ],
+    "drops": [
+      [
+        "Dropped by",
+        [
+          {
+            "name": "Judge Trifecta Maximus",
+            "icon": "/img/bosses/judge_trifecta.png",
+            "href": "/codex/raids/judge-trifecta-maximus/"
+          }
+        ]
+      ],
+      [
+        "Upgrade materials",
+        [
+          {
+            "name": "Titanium",
+            "icon": "/img/materials/titanium.png",
+            "href": "/codex/items/titanium/"
+          },
+          {
+            "name": "Fogstone",
+            "icon": "/img/materials/fogstone.png",
+            "href": "/codex/items/fogstone/"
+          }
+        ]
+      ]
+    ]
+  },
+  {
+    "category": "Items",
+    "id": "judge-trifecta-robe",
+    "name": "Judge Trifecta Robe",
+    "icon": "/img/armor/trifecta_summoner_chest.png",
+    "aura": "rare",
+    "description": "Light armor of the Judge Trifecta Maximus. The chance to automatically summon through Charon Ritual will be increased.",
+    "exotic": "Exotic",
+    "meta": [
+      [
+        "Tier",
+        "★10"
+      ],
+      [
+        "Rarity",
+        "Rare"
+      ],
+      [
+        "Useable by",
+        "Valhallan/Summoner classes"
+      ],
+      [
+        "Place",
+        "Torso"
+      ]
+    ],
+    "stats": [
+      [
+        "Defense",
+        "60"
+      ],
+      [
+        "Resistance",
+        "305"
+      ],
+      [
+        "Dexterity",
+        "60"
+      ],
+      [
+        "Ward",
+        "2%"
+      ],
+      [
+        "Charon Ritual Chance",
+        "+7%"
+      ],
+      [
+        "Summon Stats",
+        "-15.0%"
+      ],
+      [
+        "Adornment Slots",
+        "5"
+      ]
+    ],
+    "drops": [
+      [
+        "Dropped by",
+        [
+          {
+            "name": "Judge Trifecta Maximus",
+            "icon": "/img/bosses/judge_trifecta.png",
+            "href": "/codex/raids/judge-trifecta-maximus/"
+          }
+        ]
+      ],
+      [
+        "Upgrade materials",
+        [
+          {
+            "name": "Titanium",
+            "icon": "/img/materials/titanium.png",
+            "href": "/codex/items/titanium/"
+          },
+          {
+            "name": "Fogstone",
+            "icon": "/img/materials/fogstone.png",
+            "href": "/codex/items/fogstone/"
+          }
+        ]
+      ]
+    ]
+  },
+  {
+    "category": "Items",
+    "id": "judge-trifecta-sallet",
+    "name": "Judge Trifecta Sallet",
+    "icon": "/img/armor/trifecta_thief_helm.png",
+    "aura": "rare",
+    "description": "Light armor of the Judge Trifecta Maximus. When wearing this armor, the maximum Avidity that one may possess is increased.",
+    "exotic": "Exotic",
+    "meta": [
+      [
+        "Tier",
+        "★10"
+      ],
+      [
+        "Rarity",
+        "Rare"
+      ],
+      [
+        "Useable by",
+        "Thief classes"
+      ],
+      [
+        "Place",
+        "Head"
+      ]
+    ],
+    "stats": [
+      [
+        "Defense",
+        "305"
+      ],
+      [
+        "Resistance",
+        "100"
+      ],
+      [
+        "Dexterity",
+        "75"
+      ],
+      [
+        "Ward",
+        "2%"
+      ],
+      [
+        "Max Avidity",
+        "+7%"
+      ],
+      [
+        "Avidity Chance",
+        "+5%"
+      ],
+      [
+        "Adornment Slots",
+        "5"
+      ]
+    ],
+    "drops": [
+      [
+        "Dropped by",
+        [
+          {
+            "name": "Judge Trifecta Maximus",
+            "icon": "/img/bosses/judge_trifecta.png",
+            "href": "/codex/raids/judge-trifecta-maximus/"
+          }
+        ]
+      ],
+      [
+        "Upgrade materials",
+        [
+          {
+            "name": "Titanium",
+            "icon": "/img/materials/titanium.png",
+            "href": "/codex/items/titanium/"
+          },
+          {
+            "name": "Fogstone",
+            "icon": "/img/materials/fogstone.png",
+            "href": "/codex/items/fogstone/"
+          }
+        ]
+      ]
+    ]
+  },
+  {
+    "category": "Items",
     "id": "kaladanda",
     "name": "Kaladanda",
     "icon": "/img/weapons/fallen_staff.png",
@@ -135621,92 +136646,6 @@
     "icon": "/img/weapons/kerberos_claws.png",
     "aura": "rare",
     "description": "Sharp, jagged blades forged of the mighty claws of Kerberos. They can cause an opponent to bleed or become frozen.",
-    "meta": [
-      [
-        "Tier",
-        "★6"
-      ],
-      [
-        "Rarity",
-        "Rare"
-      ],
-      [
-        "Useable by",
-        "Thief classes"
-      ],
-      [
-        "Place",
-        "Weapon"
-      ],
-      [
-        "Type",
-        "Daggers"
-      ]
-    ],
-    "stats": [
-      [
-        "Attack",
-        "155"
-      ],
-      [
-        "Defense",
-        "-10"
-      ],
-      [
-        "Dexterity",
-        "20"
-      ],
-      [
-        "Ward",
-        "11%"
-      ],
-      [
-        "Adornment Slots",
-        "8"
-      ],
-      [
-        "Two handed"
-      ]
-    ],
-    "ability": [
-      "Slice",
-      "Deals damage and may cause bleeding. Additionally, it may hit an additional opponent."
-    ],
-    "drops": [
-      [
-        "Causes",
-        [
-          {
-            "chance": "5%",
-            "name": "Bleeding",
-            "icon": "/img/statuses/bleeding.png"
-          },
-          {
-            "chance": "5%",
-            "name": "Frozen",
-            "icon": "/img/statuses/frozen.png"
-          }
-        ]
-      ],
-      [
-        "Upgrade materials",
-        [
-          {
-            "name": "Wolf's Blood",
-            "icon": "/img/materials/wolf_blood.png",
-            "href": "/codex/items/wolfs-blood/"
-          }
-        ]
-      ]
-    ]
-  },
-  {
-    "category": "Items",
-    "id": "kerberos-claws-81b67c8d",
-    "name": "Kerberos Claws",
-    "icon": "/img/weapons/kerberos_claws.png",
-    "aura": "rare",
-    "description": "Sharp, jagged blades forged of the mighty claws of Kerberos. They can cause an opponent to bleed or become frozen.",
     "exotic": "Exotic",
     "meta": [
       [
@@ -135783,6 +136722,92 @@
             "name": "Follower of Kerberos",
             "icon": "/img/monsters/follower_of_kerberos2.png",
             "href": "/codex/monsters/follower-of-kerberos-ac5dc474/"
+          }
+        ]
+      ],
+      [
+        "Upgrade materials",
+        [
+          {
+            "name": "Wolf's Blood",
+            "icon": "/img/materials/wolf_blood.png",
+            "href": "/codex/items/wolfs-blood/"
+          }
+        ]
+      ]
+    ]
+  },
+  {
+    "category": "Items",
+    "id": "kerberos-claws-e7f61ea1",
+    "name": "Kerberos Claws",
+    "icon": "/img/weapons/kerberos_claws.png",
+    "aura": "rare",
+    "description": "Sharp, jagged blades forged of the mighty claws of Kerberos. They can cause an opponent to bleed or become frozen.",
+    "meta": [
+      [
+        "Tier",
+        "★6"
+      ],
+      [
+        "Rarity",
+        "Rare"
+      ],
+      [
+        "Useable by",
+        "Thief classes"
+      ],
+      [
+        "Place",
+        "Weapon"
+      ],
+      [
+        "Type",
+        "Daggers"
+      ]
+    ],
+    "stats": [
+      [
+        "Attack",
+        "155"
+      ],
+      [
+        "Defense",
+        "-10"
+      ],
+      [
+        "Dexterity",
+        "20"
+      ],
+      [
+        "Ward",
+        "11%"
+      ],
+      [
+        "Adornment Slots",
+        "8"
+      ],
+      [
+        "Two handed"
+      ]
+    ],
+    "ability": [
+      "Slice",
+      "Deals damage and may cause bleeding. Additionally, it may hit an additional opponent."
+    ],
+    "drops": [
+      [
+        "Causes",
+        [
+          {
+            "chance": "5%",
+            "name": "Bleeding",
+            "icon": "/img/statuses/bleeding.png"
+          },
+          {
+            "chance": "5%",
+            "name": "Frozen",
+            "icon": "/img/statuses/frozen.png"
           }
         ]
       ],
@@ -143184,7 +144209,7 @@
         "+3%"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+0.5%"
       ]
     ],
@@ -150164,7 +151189,7 @@
         "6"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+1%"
       ]
     ],
@@ -153117,7 +154142,7 @@
         "+6%"
       ],
       [
-        "Summon Pacts",
+        "Summon Pact Power",
         "+20%"
       ]
     ],
@@ -168419,7 +169444,7 @@
         "+25%"
       ],
       [
-        "Summon Pacts",
+        "Summon Pact Power",
         "+20%"
       ]
     ],
@@ -172345,7 +173370,7 @@
     "category": "Items",
     "id": "rift-summoner-boots",
     "name": "Rift Summoner Boots",
-    "icon": "/img/armor/rift_summoner_boots.png",
+    "icon": "/img/armor/charon_boots.png",
     "aura": "rare",
     "description": "A piece of Judge's attire worn by Charon. When standing strong with these boots, your summons will be slightly stronger.",
     "exotic": "Exotic",
@@ -172426,7 +173451,7 @@
     "category": "Items",
     "id": "rift-summoner-helmet",
     "name": "Rift Summoner Helmet",
-    "icon": "/img/armor/rift_summoner_helmet.png",
+    "icon": "/img/armor/charon_helmet.png",
     "aura": "rare",
     "description": "A piece of Judge's attire worn by Charon. When wearing this helmet, using pacts with your summons will be more effective.",
     "exotic": "Exotic",
@@ -172462,7 +173487,7 @@
         "1%"
       ],
       [
-        "Summon Pacts",
+        "Summon Pact Power",
         "+20%"
       ],
       [
@@ -172507,7 +173532,7 @@
     "category": "Items",
     "id": "rift-summoner-plate",
     "name": "Rift Summoner Plate",
-    "icon": "/img/armor/rift_summoner_plate.png",
+    "icon": "/img/armor/charon_plate.png",
     "aura": "rare",
     "description": "A piece of Judge's attire worn by Charon. When wearing this armor, your summons will be more likely to protect you.",
     "exotic": "Exotic",
@@ -172588,7 +173613,7 @@
     "category": "Items",
     "id": "riftguard-armor",
     "name": "Riftguard Armor",
-    "icon": "/img/armor/riftguard_armor.png",
+    "icon": "/img/armor/rhada_armor.png",
     "aura": "rare",
     "description": "A piece of Judge's attire worn by Rhada. When taking Ward damage while wearing this armor, one will take reduced self damage from status effects.",
     "exotic": "Exotic",
@@ -172673,7 +173698,7 @@
     "category": "Items",
     "id": "riftguard-helmet",
     "name": "Riftguard Helmet",
-    "icon": "/img/armor/riftguard_helmet.png",
+    "icon": "/img/armor/rhada_helmet.png",
     "aura": "rare",
     "description": "A piece of Judge's attire worn by Rhada. When taking Ward damage while wearing this armor, HP and Mana will be recovered by a percentage of the Ward damage taken.",
     "exotic": "Exotic",
@@ -172762,7 +173787,7 @@
     "category": "Items",
     "id": "riftguard-leggings",
     "name": "Riftguard Leggings",
-    "icon": "/img/armor/riftguard_leggings.png",
+    "icon": "/img/armor/rhada_leggings.png",
     "aura": "rare",
     "description": "A piece of Judge's attire worn by Rhada. When taking Ward damage while wearing this armor, HP and Mana will be recovered by a percentage of the Ward damage taken.",
     "exotic": "Exotic",
@@ -172851,7 +173876,7 @@
     "category": "Items",
     "id": "riftrogue-boots",
     "name": "Riftrogue Boots",
-    "icon": "/img/armor/riftrogue_boots.png",
+    "icon": "/img/armor/achlys_boots.png",
     "aura": "rare",
     "description": "A piece of Judge's attire worn by Achlys. One may move with extra grace when wearing this armor, decreasing your chance to miss your mark.",
     "exotic": "Exotic",
@@ -172936,7 +173961,7 @@
     "category": "Items",
     "id": "riftrogue-chestplate",
     "name": "Riftrogue Chestplate",
-    "icon": "/img/armor/riftrogue_chestplate.png",
+    "icon": "/img/armor/achlys_chestplate.png",
     "aura": "rare",
     "description": "A piece of Judge's attire worn by Achlys. One may move with extra grace when wearing this armor, decreasing your chance to miss your mark.",
     "exotic": "Exotic",
@@ -173021,7 +174046,7 @@
     "category": "Items",
     "id": "riftrogue-helmet",
     "name": "Riftrogue Helmet",
-    "icon": "/img/armor/riftrogue_helmet.png",
+    "icon": "/img/armor/achlys_helmet.png",
     "aura": "rare",
     "description": "A piece of Judge's attire worn by Achlys. One may move with extra grace when wearing this armor, decreasing your chance to miss your mark.",
     "exotic": "Exotic",
@@ -179129,6 +180154,29 @@
   },
   {
     "category": "Items",
+    "id": "scroll-of-the-judges-trifecta",
+    "name": "Scroll of the Judges Trifecta",
+    "icon": "/img/useables/summoning_scroll_rift3.png",
+    "aura": "legendary",
+    "description": "A scroll consisting of Elysian lore. Read this scroll to summon the Judge Trifecta Maximus super raid to your location.",
+    "exotic": "Exotic",
+    "meta": [
+      [
+        "Tier",
+        "★10"
+      ],
+      [
+        "Rarity",
+        "Legendary"
+      ],
+      [
+        "Useable by",
+        "All classes"
+      ]
+    ]
+  },
+  {
+    "category": "Items",
     "id": "scroll-of-the-sapling",
     "name": "Scroll of the Sapling",
     "icon": "/img/useables/summoning_scroll_ygg.png",
@@ -180552,7 +181600,7 @@
         "+3%"
       ],
       [
-        "Summon Pacts",
+        "Summon Pact Power",
         "+3%"
       ]
     ],
@@ -190834,7 +191882,7 @@
         "12"
       ],
       [
-        "Summon Pacts",
+        "Summon Pact Power",
         "+10%"
       ]
     ],
@@ -205646,7 +206694,7 @@
         "2%"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+5%"
       ],
       [
@@ -208194,7 +209242,7 @@
         "+7%"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+4%"
       ],
       [
@@ -208297,7 +209345,7 @@
         "+7%"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+4%"
       ],
       [
@@ -208546,7 +209594,7 @@
         "+7%"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+4%"
       ],
       [
@@ -209883,7 +210931,7 @@
         "+5%"
       ],
       [
-        "Avidity",
+        "Avidity Chance",
         "+4%"
       ],
       [
@@ -211138,7 +212186,7 @@
     "name": "Zagreus Chestplate",
     "icon": "/img/armor/zagreus_chestplate.png",
     "aura": "famed",
-    "description": "Gear of Zagreus, fallen Judge of Elysium. Zagreus was once a Judge of Elysium, but fell within the Rift during Whiterift while flaunting his beastly antics. His followers followed him to the Underworld below.",
+    "description": "Gear of Zagreus, fallen Judge of Elysium. Zagreus was once a Judge of Elysium, but was later banished to the Dark Rift. His followers followed him to the Underworld below.",
     "exotic": "Exotic",
     "meta": [
       [
@@ -211222,7 +212270,7 @@
     "name": "Zagreus Headwrap",
     "icon": "/img/armor/zagreus_headwrap.png",
     "aura": "famed",
-    "description": "Gear of Zagreus, fallen Judge of Elysium. Zagreus was once a Judge of Elysium, but fell within the Rift during Whiterift while flaunting his beastly antics. His followers followed him to the Underworld below.",
+    "description": "Gear of Zagreus, fallen Judge of Elysium. Zagreus was once a Judge of Elysium, but was later banished to the Dark Rift. His followers followed him to the Underworld below.",
     "exotic": "Exotic",
     "meta": [
       [
@@ -211306,7 +212354,7 @@
     "name": "Zagreus Legwraps",
     "icon": "/img/armor/zagreus_legwraps.png",
     "aura": "famed",
-    "description": "Gear of Zagreus, fallen Judge of Elysium. Zagreus was once a Judge of Elysium, but fell within the Rift during Whiterift while flaunting his beastly antics. His followers followed him to the Underworld below.",
+    "description": "Gear of Zagreus, fallen Judge of Elysium. Zagreus was once a Judge of Elysium, but was later banished to the Dark Rift. His followers followed him to the Underworld below.",
     "exotic": "Exotic",
     "meta": [
       [
@@ -213351,6 +214399,43 @@
             "href": "/codex/items/lightningstone/"
           }
         ]
+      ]
+    ]
+  },
+  {
+    "category": "Items",
+    "id": "zeta-riftlock",
+    "name": "Zeta Riftlock",
+    "icon": "/img/acc/riftshard2.png",
+    "aura": "legendary",
+    "description": "A strange Riftlock of unknown origin. When carrying this Riftlock in Anguished content, less Ascension Levels will be forfeited when applying Ascension Shackles. Additionally, Ascension Shackles will provide more rewards and proofs.",
+    "exotic": "Exotic",
+    "meta": [
+      [
+        "Tier",
+        "★10"
+      ],
+      [
+        "Rarity",
+        "Legendary"
+      ],
+      [
+        "Useable by",
+        "All classes"
+      ],
+      [
+        "Place",
+        "Accessory"
+      ]
+    ],
+    "stats": [
+      [
+        "Bonus Shackled Ascension Levels",
+        "5"
+      ],
+      [
+        "Shackled Rewards",
+        "+15%"
       ]
     ]
   }

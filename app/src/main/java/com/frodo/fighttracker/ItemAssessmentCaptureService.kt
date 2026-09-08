@@ -1,5 +1,6 @@
 package com.frodo.fighttracker
 
+import android.app.Activity
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,78 +11,125 @@ import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.media.Image
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Looper
 import android.util.DisplayMetrics
 import android.util.Log
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
-import android.app.Activity
-import android.os.HandlerThread
+import java.util.concurrent.Future
+import java.util.concurrent.atomic.AtomicLong
 
 private const val ASSESSMENT_CROP_BOTTOM_RATIO = 0.50f
 
 class ItemAssessmentCaptureService : Service() {
 
-    private val assessmentExecutor =
+    /*
+     * Pipeline initialization ma osobny executor.
+     *
+     * Nie używamy assessmentExecutor do preloadowania pipeline,
+     * ponieważ assessmentExecutor jest tworzony osobno dla każdego
+     * aktualnego assessmentu.
+     */
+    private val pipelineInitExecutor =
         Executors.newSingleThreadExecutor()
 
-    private val processingFrame =
-        AtomicBoolean(false)
+    /*
+     * Aktualny worker assessmentu.
+     *
+     * Przy zmianie fingerprintu:
+     *
+     * 1. cancel(true)
+     * 2. shutdownNow()
+     * 3. tworzony jest NOWY executor
+     * 4. assessment startuje natychmiast
+     *
+     * Dzięki temu nie tworzymy kolejki:
+     *
+     * item A -> CANCEL
+     * item B -> CANCEL
+     * item C -> CANCEL
+     * item D -> ASSESS
+     */
+    @Volatile
+    private var currentAssessmentExecutor: ExecutorService? = null
+
+    @Volatile
+    private var currentAssessmentFuture: Future<*>? = null
+
+    /*
+     * Każda zmiana fingerprintu dostaje nową generację.
+     *
+     * Dzięki temu nawet gdy stary worker nie zdąży fizycznie
+     * zatrzymać się w kodzie natywnym, jego wynik zostanie
+     * odrzucony i nie pokaże starego itemu.
+     */
+    private val assessmentGeneration =
+        AtomicLong(0L)
+
+    private lateinit var pipeline
+
+            : ItemAssessmentPipeline
 
     private var lastFrameFingerprint: IntArray? = null
 
-    private var pendingBitmap: Bitmap? = null
-
-    private val pendingFrameLock = Any()
-
-    private lateinit var pipeline: ItemAssessmentPipeline
+    private val fingerprintLock = Any()
 
     companion object {
 
-        private const val TAG = "ItemAssessmentCapture"
+        private const val TAG =
+            "ItemAssessmentCapture"
 
-        const val EXTRA_RESULT_CODE = "resultCode"
-        const val EXTRA_DATA = "data"
+        const val EXTRA_RESULT_CODE =
+            "resultCode"
+
+        const val EXTRA_DATA =
+            "data"
 
         private const val CHANNEL_ID =
             "item_assessment_capture"
 
         private const val NOTIFICATION_ID =
             2001
-
     }
 
     private lateinit var projectionManager: MediaProjectionManager
 
     private var mediaProjection: MediaProjection? = null
+
     private var virtualDisplay: VirtualDisplay? = null
+
     private var imageReader: ImageReader? = null
 
     private val handler =
         Handler(Looper.getMainLooper())
 
+    /*
+     * Frame acquisition działa na osobnym wątku,
+     * żeby callback ImageReader nie obciążał main thread.
+     */
     private lateinit var captureThread: HandlerThread
+
     private lateinit var captureHandler: Handler
 
-    private var isCapturing = false
+    private var isCapturing =
+        false
 
-    private var lastFrameHash: LongArray? = null
+    private var screenWidth =
+        0
 
-    private var screenWidth = 0
-    private var screenHeight = 0
-    private var screenDensity = 0
+    private var screenHeight =
+        0
 
-    /**
-     * Zapobiega wielokrotnemu przetwarzaniu tej samej klatki.
-     */
-
-
+    private var screenDensity =
+        0
 
     override fun onCreate() {
 
@@ -98,18 +146,28 @@ class ItemAssessmentCaptureService : Service() {
             ) as MediaProjectionManager
 
         captureThread =
-            HandlerThread("ItemAssessmentCapture")
+            HandlerThread(
+                "ItemAssessmentCapture"
+            )
 
         captureThread.start()
 
         captureHandler =
-            Handler(captureThread.looper)
+            Handler(
+                captureThread.looper
+            )
 
         createNotificationChannel()
 
         startForegroundServiceNotification()
 
-        assessmentExecutor.execute {
+        /*
+         * Pipeline powinien być już preloadowany przez
+         * FloatingTrackerService.
+         *
+         * Tutaj tylko pobieramy gotową instancję.
+         */
+        pipelineInitExecutor.execute {
 
             try {
 
@@ -142,11 +200,20 @@ class ItemAssessmentCaptureService : Service() {
         startId: Int
     ): Int {
 
-        Log.d(TAG, "onStartCommand")
+        Log.d(
+            TAG,
+            "onStartCommand"
+        )
 
         if (intent == null) {
-            Log.e(TAG, "Intent is null")
+
+            Log.e(
+                TAG,
+                "Intent is null"
+            )
+
             stopSelf()
+
             return START_NOT_STICKY
         }
 
@@ -157,7 +224,10 @@ class ItemAssessmentCaptureService : Service() {
             )
 
         val projectionData =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (
+                Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.TIRAMISU
+            ) {
 
                 intent.getParcelableExtra(
                     EXTRA_DATA,
@@ -167,8 +237,11 @@ class ItemAssessmentCaptureService : Service() {
             } else {
 
                 @Suppress("DEPRECATION")
-                intent.getParcelableExtra(EXTRA_DATA)
+                intent.getParcelableExtra(
+                    EXTRA_DATA
+                )
             }
+
         Log.d(
             TAG,
             "resultCode=$resultCode"
@@ -200,6 +273,7 @@ class ItemAssessmentCaptureService : Service() {
             )
 
             stopSelf()
+
             return START_NOT_STICKY
         }
 
@@ -230,7 +304,9 @@ class ItemAssessmentCaptureService : Service() {
         @Suppress("DEPRECATION")
         windowManager
             .defaultDisplay
-            .getRealMetrics(metrics)
+            .getRealMetrics(
+                metrics
+            )
 
         screenWidth =
             metrics.widthPixels
@@ -260,6 +336,7 @@ class ItemAssessmentCaptureService : Service() {
             )
 
             stopSelf()
+
             return
         }
 
@@ -272,17 +349,21 @@ class ItemAssessmentCaptureService : Service() {
 
         createVirtualDisplay()
 
-        isCapturing = true
+        isCapturing =
+            true
 
-        FloatingTrackerService.setScanning(true)
+        FloatingTrackerService.setScanning(
+            true
+        )
 
         Log.d(
             TAG,
             "Item assessment capture started"
         )
     }
+
     private fun imageToBitmap(
-        image: android.media.Image
+        image: Image
     ): Bitmap? {
 
         val plane =
@@ -305,7 +386,8 @@ class ItemAssessmentCaptureService : Service() {
 
         val bitmapWidth =
             image.width +
-                    rowPadding / pixelStride
+                    rowPadding /
+                    pixelStride
 
         val bitmap =
             Bitmap.createBitmap(
@@ -320,7 +402,10 @@ class ItemAssessmentCaptureService : Service() {
             buffer
         )
 
-        if (bitmapWidth != image.width) {
+        if (
+            bitmapWidth !=
+            image.width
+        ) {
 
             return Bitmap.createBitmap(
                 bitmap,
@@ -337,36 +422,152 @@ class ItemAssessmentCaptureService : Service() {
         return bitmap
     }
 
+    /**
+     * Tani fingerprint ekranu.
+     *
+     * Celowo patrzymy tylko na lewą i prawą część ekranu,
+     * ponieważ środek zawiera animowaną aurę itemu.
+     *
+     * 4 próbki poziomo x 32 pionowo
+     * dla każdej strony.
+     *
+     * RGB jest kwantyzowane do 5 bitów/channel.
+     */
     private fun frameFingerprint(
-        bitmap: Bitmap
+        image: Image
     ): IntArray {
 
-        val cells = 16
+        val plane =
+            image.planes.firstOrNull()
+                ?: return intArrayOf(
+                    0,
+                    0
+                )
 
-        val scaled =
-            Bitmap.createScaledBitmap(
-                bitmap,
-                cells,
-                cells,
-                true
-            )
+        val buffer =
+            plane.buffer
 
-        val pixels =
-            IntArray(cells * cells)
+        val pixelStride =
+            plane.pixelStride
 
-        scaled.getPixels(
-            pixels,
-            0,
-            cells,
-            0,
-            0,
-            cells,
-            cells
+        val rowStride =
+            plane.rowStride
+
+        val width =
+            image.width
+
+        val height =
+            image.height
+
+        val sideWidth =
+            width / 4
+
+        val horizontalSamples =
+            4
+
+        val verticalSamples =
+            32
+
+        var leftHash =
+            0
+
+        var rightHash =
+            0
+
+        /*
+         * LEFT + RIGHT
+         */
+        for (side in 0..1) {
+
+            var hash =
+                0
+
+            for (yIndex in 0 until verticalSamples) {
+
+                val y =
+                    (
+                            yIndex *
+                                    (height - 1)
+                            ) /
+                            (verticalSamples - 1)
+
+                for (
+                xIndex in 0 until horizontalSamples
+                ) {
+
+                    val localX =
+                        (
+                                xIndex *
+                                        (sideWidth - 1)
+                                ) /
+                                (horizontalSamples - 1)
+
+                    val x =
+                        if (side == 0) {
+                            localX
+                        } else {
+                            width -
+                                    sideWidth +
+                                    localX
+                        }
+
+                    val offset =
+                        y * rowStride +
+                                x * pixelStride
+
+                    if (
+                        offset < 0 ||
+                        offset + 2 >= buffer.limit()
+                    ) {
+                        continue
+                    }
+
+                    val r =
+                        buffer.get(
+                            offset
+                        ).toInt() and 0xFF
+
+                    val g =
+                        buffer.get(
+                            offset + 1
+                        ).toInt() and 0xFF
+
+                    val b =
+                        buffer.get(
+                            offset + 2
+                        ).toInt() and 0xFF
+
+                    /*
+                     * 5 bit/channel.
+                     */
+                    val qr =
+                        r shr 3
+
+                    val qg =
+                        g shr 3
+
+                    val qb =
+                        b shr 3
+
+                    hash =
+                        hash * 31 +
+                                (qr shl 10) +
+                                (qg shl 5) +
+                                qb
+                }
+            }
+
+            if (side == 0) {
+                leftHash = hash
+            } else {
+                rightHash = hash
+            }
+        }
+
+        return intArrayOf(
+            leftHash,
+            rightHash
         )
-
-        scaled.recycle()
-
-        return pixels
     }
 
     private fun createImageReader() {
@@ -386,19 +587,82 @@ class ItemAssessmentCaptureService : Service() {
                     reader.acquireLatestImage()
                         ?: return@setOnImageAvailableListener
 
-                var bitmap: Bitmap? = null
+                var bitmap:
+                        Bitmap? = null
+
+                var cropped:
+                        Bitmap? = null
 
                 try {
 
+                    /*
+                     * NAJPIERW fingerprint bez tworzenia Bitmapy.
+                     *
+                     * Jeżeli ekran się nie zmienił,
+                     * kończymy tutaj.
+                     */
+                    val fingerprint =
+                        frameFingerprint(
+                            image
+                        )
+
+                    val generation =
+                        synchronized(
+                            fingerprintLock
+                        ) {
+
+                            if (
+                                fingerprint.contentEquals(
+                                    lastFrameFingerprint
+                                )
+                            ) {
+
+                                Log.d(
+                                    TAG,
+                                    "Fingerprint unchanged - skipping"
+                                )
+
+                                return@setOnImageAvailableListener
+                            }
+
+                            /*
+                             * Fingerprint się zmienił.
+                             *
+                             * Nowa generacja = wszystkie wyniki
+                             * starszych assessmentów są nieważne.
+                             */
+                            lastFrameFingerprint =
+                                fingerprint
+
+                            assessmentGeneration.incrementAndGet()
+                        }
+
+                    Log.d(
+                        TAG,
+                        "Fingerprint CHANGED -> cancelling previous assessment"
+                    )
+
+                    /*
+                     * NATYCHMIAST anulujemy poprzedni worker.
+                     */
+                    cancelCurrentAssessment()
+
+                    /*
+                     * Dopiero teraz tworzymy Bitmapę.
+                     */
                     bitmap =
-                        imageToBitmap(image)
+                        imageToBitmap(
+                            image
+                        )
                             ?: return@setOnImageAvailableListener
 
                     val cropHeight =
-                        (bitmap.height * ASSESSMENT_CROP_BOTTOM_RATIO)
-                            .toInt()
+                        (
+                                bitmap.height *
+                                        ASSESSMENT_CROP_BOTTOM_RATIO
+                                ).toInt()
 
-                    val cropped =
+                    cropped =
                         Bitmap.createBitmap(
                             bitmap,
                             0,
@@ -409,63 +673,31 @@ class ItemAssessmentCaptureService : Service() {
 
                     Log.d(
                         TAG,
-                        "Assessment crop: " +
-                                "${cropped.width}x${cropped.height}"
+                        "Assessment crop: ${cropped.width}x${cropped.height}"
                     )
 
-                    val fingerprint =
-                        frameFingerprint(cropped)
+                    /*
+                     * Assessment STARTUJE NATYCHMIAST.
+                     *
+                     * ŻADNEGO:
+                     * postDelayed(...)
+                     * debounce
+                     * stability timer
+                     * czekania 2300 ms.
+                     */
+                    startAssessment(
+                        cropped,
+                        generation
+                    )
 
-                    var accepted = false
+                    /*
+                     * Ownership Bitmapy przejmuje worker.
+                     */
+                    cropped = null
 
-                    synchronized(pendingFrameLock) {
-
-                        when {
-
-
-                            fingerprint.contentEquals(
-                                lastFrameFingerprint
-                            ) -> {
-                                Log.d(
-                                    TAG,
-                                    "Frame unchanged - skipping"
-                                )
-                            }
-
-                            processingFrame.get() -> {
-                                Log.d(
-                                    TAG,
-                                    "Busy - storing newest frame"
-                                )
-
-                                lastFrameFingerprint =
-                                    fingerprint
-
-                                pendingBitmap?.recycle()
-
-                                pendingBitmap = cropped
-
-                                accepted = true
-                            }
-
-                            else -> {
-                                lastFrameFingerprint =
-                                    fingerprint
-
-                                processingFrame.set(true)
-
-                                accepted = true
-
-                                runAssessment(cropped)
-                            }
-                        }
-                    }
-
-                    if (!accepted) {
-                        cropped.recycle()
-                    }
-
-                } catch (e: Exception) {
+                } catch (
+                    e: Exception
+                ) {
 
                     Log.e(
                         TAG,
@@ -473,7 +705,12 @@ class ItemAssessmentCaptureService : Service() {
                         e
                     )
 
-                    processingFrame.set(false)
+                    cropped?.let {
+
+                        if (!it.isRecycled) {
+                            it.recycle()
+                        }
+                    }
 
                 } finally {
 
@@ -491,59 +728,286 @@ class ItemAssessmentCaptureService : Service() {
         )
     }
 
-    private fun runAssessment(cropped: Bitmap) {
+    /**
+     * Uruchamia dokładnie JEDEN aktualny assessment.
+     *
+     * Każdy poprzedni worker jest wcześniej anulowany.
+     */
+    private fun startAssessment(
+        cropped: Bitmap,
+        generation: Long
+    ) {
 
-        assessmentExecutor.execute {
+        val executor =
+            Executors.newSingleThreadExecutor()
 
-            try {
+        currentAssessmentExecutor =
+            executor
 
-                if (!::pipeline.isInitialized) {
+        try {
 
-                    pipeline =
-                        ItemAssessmentPipeline
-                            .ItemAssessmentManager
-                            .getPipeline(
-                                applicationContext
+            val future =
+                executor.submit {
+
+                    try {
+
+                        /*
+                         * Jeżeli w międzyczasie pojawił się
+                         * nowszy fingerprint, ten worker jest
+                         * już nieaktualny.
+                         */
+                        if (
+                            assessmentGeneration.get() !=
+                            generation
+                        ) {
+
+                            Log.d(
+                                TAG,
+                                "Assessment $generation already stale"
                             )
+
+                            return@submit
+                        }
+
+                        if (
+                            Thread.currentThread()
+                                .isInterrupted
+                        ) {
+
+                            Log.d(
+                                TAG,
+                                "Assessment $generation interrupted before start"
+                            )
+
+                            return@submit
+                        }
+
+                        if (!::pipeline.isInitialized) {
+
+                            Log.d(
+                                TAG,
+                                "Pipeline not initialized yet - loading"
+                            )
+
+                            pipeline =
+                                ItemAssessmentPipeline
+                                    .ItemAssessmentManager
+                                    .getPipeline(
+                                        applicationContext
+                                    )
+                        }
+
+                        if (
+                            assessmentGeneration.get() !=
+                            generation ||
+                            Thread.currentThread()
+                                .isInterrupted
+                        ) {
+
+                            Log.d(
+                                TAG,
+                                "Assessment $generation cancelled before pipeline"
+                            )
+
+                            return@submit
+                        }
+
+                        Log.d(
+                            TAG,
+                            "START ASSESSMENT generation=$generation"
+                        )
+
+                        val result =
+                            pipeline.processBitmap(
+                                cropped
+                            )
+
+                        /*
+                         * NAJWAŻNIEJSZE:
+                         *
+                         * Nawet jeżeli cancel(true) nie przerwie
+                         * natychmiast kodu natywnego ONNX,
+                         * stary wynik nie może trafić na overlay.
+                         */
+                        if (
+                            assessmentGeneration.get() !=
+                            generation
+                        ) {
+
+                            Log.d(
+                                TAG,
+                                "Ignoring stale assessment result generation=$generation"
+                            )
+
+                            return@submit
+                        }
+
+                        if (
+                            Thread.currentThread()
+                                .isInterrupted
+                        ) {
+
+                            Log.d(
+                                TAG,
+                                "Ignoring interrupted assessment generation=$generation"
+                            )
+
+                            return@submit
+                        }
+
+                        Log.d(
+                            TAG,
+                            "ASSESSMENT FINISHED generation=$generation"
+                        )
+
+                        handleAssessmentResult(
+                            result,
+                            generation
+                        )
+
+                    } catch (
+                        e: Exception
+                    ) {
+
+                        /*
+                         * Cancellation przez Future.cancel(true)
+                         * może objawić się wyjątkiem.
+                         * Nie traktujemy tego jako błędu aplikacji,
+                         * jeżeli worker jest już nieaktualny.
+                         */
+                        if (
+                            assessmentGeneration.get() ==
+                            generation
+                        ) {
+
+                            Log.e(
+                                TAG,
+                                "Background assessment failed",
+                                e
+                            )
+                        } else {
+
+                            Log.d(
+                                TAG,
+                                "Old assessment terminated: generation=$generation"
+                            )
+                        }
+
+                    } finally {
+
+                        if (
+                            !cropped.isRecycled
+                        ) {
+
+                            cropped.recycle()
+                        }
+
+                        /*
+                         * Ten worker nie uruchamia żadnego
+                         * następnego assessmentu.
+                         *
+                         * Następny assessment może uruchomić
+                         * WYŁĄCZNIE kolejna zmiana fingerprintu.
+                         */
+                    }
                 }
 
-                val result =
-                    pipeline.processBitmap(cropped)
+            currentAssessmentFuture =
+                future
 
-                handleAssessmentResult(result)
+        } catch (
+            e: Exception
+        ) {
 
-            } catch (e: Exception) {
+            Log.e(
+                TAG,
+                "Could not start assessment worker",
+                e
+            )
 
-                Log.e(
-                    TAG,
-                    "Background assessment failed",
-                    e
-                )
+            if (
+                !cropped.isRecycled
+            ) {
 
-            } finally {
+                cropped.recycle()
+            }
 
-                if (!cropped.isRecycled) {
-                    cropped.recycle()
-                }
+            executor.shutdownNow()
 
-                val next = synchronized(pendingFrameLock) {
+            if (
+                currentAssessmentExecutor ===
+                executor
+            ) {
 
-                    val drained = pendingBitmap
-                    pendingBitmap = null
-                    processingFrame.set(drained != null)
-                    drained
-                }
-
-                if (next != null) {
-                    runAssessment(next)
-                }
+                currentAssessmentExecutor =
+                    null
             }
         }
     }
 
+    /**
+     * Anuluje absolutnie aktualny assessment.
+     *
+     * Nie zostawia go w kolejce.
+     */
+    private fun cancelCurrentAssessment() {
+
+        val future =
+            currentAssessmentFuture
+
+        val executor =
+            currentAssessmentExecutor
+
+        currentAssessmentFuture =
+            null
+
+        currentAssessmentExecutor =
+            null
+
+        if (future != null) {
+
+            Log.d(
+                TAG,
+                "Cancelling previous assessment"
+            )
+
+            future.cancel(
+                true
+            )
+        }
+
+        if (executor != null) {
+
+            Log.d(
+                TAG,
+                "Shutting down previous assessment worker"
+            )
+
+            executor.shutdownNow()
+        }
+    }
+
     private fun handleAssessmentResult(
-        result: ItemAssessmentPipeline.PipelineResult
+        result:
+        ItemAssessmentPipeline.PipelineResult,
+        generation: Long
     ) {
+
+        /*
+         * Jeszcze jedna kontrola przed pokazaniem overlay.
+         */
+        if (
+            assessmentGeneration.get() !=
+            generation
+        ) {
+
+            Log.d(
+                TAG,
+                "Ignoring stale result before overlay"
+            )
+
+            return
+        }
 
         if (
             result.item == null ||
@@ -588,7 +1052,8 @@ class ItemAssessmentCaptureService : Service() {
             Log.d(
                 TAG,
                 "QUALITY: %.2f%%".format(
-                    assessment.exactQuality * 100.0
+                    assessment.exactQuality *
+                            100.0
                 )
             )
 
@@ -597,8 +1062,10 @@ class ItemAssessmentCaptureService : Service() {
             Log.d(
                 TAG,
                 "QUALITY RANGE: %.2f%% - %.2f%%".format(
-                    assessment.qualityRangeMin * 100.0,
-                    assessment.qualityRangeMax * 100.0
+                    assessment.qualityRangeMin *
+                            100.0,
+                    assessment.qualityRangeMax *
+                            100.0
                 )
             )
         }
@@ -607,6 +1074,25 @@ class ItemAssessmentCaptureService : Service() {
             TAG,
             "========================================"
         )
+
+        /*
+         * Ostatni check tuż przed overlay.
+         *
+         * Jeżeli użytkownik zmienił item podczas
+         * przetwarzania, wynik jest ignorowany.
+         */
+        if (
+            assessmentGeneration.get() !=
+            generation
+        ) {
+
+            Log.d(
+                TAG,
+                "Fingerprint changed before overlay - ignoring result"
+            )
+
+            return
+        }
 
         ItemQualityOverlayService.showAssessment(
             context = applicationContext,
@@ -633,7 +1119,9 @@ class ItemAssessmentCaptureService : Service() {
                 handler
             )
 
-        if (virtualDisplay == null) {
+        if (
+            virtualDisplay == null
+        ) {
 
             Log.e(
                 TAG,
@@ -646,10 +1134,12 @@ class ItemAssessmentCaptureService : Service() {
 
     private fun stopCapture() {
 
-        synchronized(pendingFrameLock) {
-            pendingBitmap?.recycle()
-            pendingBitmap = null
-        }
+        /*
+         * Najpierw anulujemy aktualny assessment.
+         */
+        assessmentGeneration.incrementAndGet()
+
+        cancelCurrentAssessment()
 
         if (!isCapturing) {
             return
@@ -660,25 +1150,39 @@ class ItemAssessmentCaptureService : Service() {
             "Stopping item assessment capture"
         )
 
-        isCapturing = false
+        isCapturing =
+            false
 
-        FloatingTrackerService.setScanning(false)
-
+        FloatingTrackerService.setScanning(
+            false
+        )
 
         virtualDisplay?.release()
-        virtualDisplay = null
+
+        virtualDisplay =
+            null
 
         imageReader?.close()
-        imageReader = null
+
+        imageReader =
+            null
 
         mediaProjection?.unregisterCallback(
             projectionCallback
         )
 
         mediaProjection?.stop()
-        mediaProjection = null
 
-        processingFrame.set(false)
+        mediaProjection =
+            null
+
+        synchronized(
+            fingerprintLock
+        ) {
+
+            lastFrameFingerprint =
+                null
+        }
     }
 
     private val projectionCallback =
@@ -697,7 +1201,10 @@ class ItemAssessmentCaptureService : Service() {
 
     private fun createNotificationChannel() {
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (
+            Build.VERSION.SDK_INT >=
+            Build.VERSION_CODES.O
+        ) {
 
             val channel =
                 NotificationChannel(
@@ -723,7 +1230,10 @@ class ItemAssessmentCaptureService : Service() {
     private fun startForegroundServiceNotification() {
 
         val notification =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (
+                Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.O
+            ) {
 
                 Notification.Builder(
                     this,
@@ -732,7 +1242,9 @@ class ItemAssessmentCaptureService : Service() {
 
             } else {
 
-                Notification.Builder(this)
+                Notification.Builder(
+                    this
+                )
             }
                 .setContentTitle(
                     "Fight Tracker"
@@ -743,10 +1255,15 @@ class ItemAssessmentCaptureService : Service() {
                 .setSmallIcon(
                     android.R.drawable.ic_menu_view
                 )
-                .setOngoing(true)
+                .setOngoing(
+                    true
+                )
                 .build()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        if (
+            Build.VERSION.SDK_INT >=
+            Build.VERSION_CODES.Q
+        ) {
 
             startForeground(
                 NOTIFICATION_ID,
@@ -772,20 +1289,28 @@ class ItemAssessmentCaptureService : Service() {
 
         stopCapture()
 
-        assessmentExecutor.shutdownNow()
-        captureHandler.removeCallbacksAndMessages(null)
+        pipelineInitExecutor.shutdownNow()
+
+        captureHandler.removeCallbacksAndMessages(
+            null
+        )
 
         captureThread.quitSafely()
-        FloatingTrackerService.setScanning(false)
+
+        FloatingTrackerService.setScanning(
+            false
+        )
 
         super.onDestroy()
     }
 
     override fun onBind(
         intent: Intent?
-    ): IBinder? = null
+    ): IBinder? =
+        null
 
-    private val windowManager: android.view.WindowManager
+    private val windowManager:
+            android.view.WindowManager
         get() =
             getSystemService(
                 WINDOW_SERVICE

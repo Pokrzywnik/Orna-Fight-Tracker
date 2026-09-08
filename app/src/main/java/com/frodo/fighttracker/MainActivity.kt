@@ -40,6 +40,51 @@ private lateinit var codexFragment: WebFragment
 
 object SettingsStore {
 
+    private const val KEY_ASSESS_DATABASE_URL =
+        "assess_database_url"
+
+    fun getAssessDatabaseUrl(
+        context: Context
+    ): String {
+
+        return context
+            .getSharedPreferences(
+                PREF,
+                Context.MODE_PRIVATE
+            )
+            .getString(
+                KEY_ASSESS_DATABASE_URL,
+                "local"
+            )
+            ?.trim()
+            ?.ifBlank {
+                "local"
+            }
+            ?: "local"
+    }
+
+    fun setAssessDatabaseUrl(
+        context: Context,
+        value: String
+    ) {
+
+        context
+            .getSharedPreferences(
+                PREF,
+                Context.MODE_PRIVATE
+            )
+            .edit()
+            .putString(
+                KEY_ASSESS_DATABASE_URL,
+                value.trim()
+                    .ifBlank {
+                        "local"
+                    }
+            )
+            .apply()
+    }
+
+
     private const val KEY_HIGH_QUALITY_OCR = "high_quality_ocr"
     private const val KEY_LEGACY_OCR = "legacy_ocr"
 
@@ -137,7 +182,7 @@ object SettingsStore {
 
     fun getScanInterval(context: Context): Long {
         return context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
-            .getLong(KEY_SCAN_INTERVAL, 2500L) // default 2.5s
+            .getLong(KEY_SCAN_INTERVAL, 500L) // default 0.5s
     }
 
     fun setScanInterval(context: Context, value: Long) {
@@ -378,6 +423,11 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
 
         setContentView(binding.root)
+        ItemDatabaseManager.initialize(this)
+
+        ItemAssessmentPipeline
+            .ItemAssessmentManager
+            .initialize(this)
         updateFloatingButton()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
 
@@ -662,6 +712,15 @@ class MainActivity : AppCompatActivity() {
         val scanInput = dialogView.findViewById<android.widget.EditText>(R.id.scanIntervalInput)
         val codexGroup = dialogView.findViewById<android.widget.RadioGroup>(R.id.codexGroup)
 
+        val assessDatabaseUrlInput =
+            dialogView.findViewById<android.widget.EditText>(
+                R.id.assessDatabaseUrlInput
+            )
+
+        assessDatabaseUrlInput.setText(
+            SettingsStore.getAssessDatabaseUrl(this)
+        )
+
         scanInput.setText(SettingsStore.getScanInterval(this).toString())
 
         val current = SettingsStore.getCodexType(this)
@@ -746,7 +805,23 @@ class MainActivity : AppCompatActivity() {
 
                 SettingsStore.setAnguishVersion(this, anguishVersion)
 
+                val assessDatabaseUrl =
+                    assessDatabaseUrlInput.text
+                        .toString()
+                        .trim()
+                        .ifBlank {
+                            "local"
+                        }
 
+                SettingsStore.setAssessDatabaseUrl(
+                    this,
+                    assessDatabaseUrl
+                )
+
+                ItemDatabaseManager.setDatabaseUrl(
+                    this,
+                    assessDatabaseUrl
+                )
 
                 val hour = if (Build.VERSION.SDK_INT >= 23)
                     timePicker.hour

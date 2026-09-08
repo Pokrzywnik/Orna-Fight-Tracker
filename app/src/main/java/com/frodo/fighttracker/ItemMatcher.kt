@@ -139,6 +139,18 @@ class ItemMatcher(
         Log.d(TAG, "INITIALIZING ITEM MATCHER")
         Log.d(TAG, "========================================")
 
+        /*
+         * Initialize database manager.
+         *
+         * This loads:
+         *
+         * - assets/items.json when source = local
+         * - cached remote items.json when source = URL
+         */
+        ItemDatabaseManager.initialize(
+            context
+        )
+
         loadItems()
 
         Log.d(
@@ -147,6 +159,44 @@ class ItemMatcher(
         )
 
         Log.d(TAG, "========================================")
+    }
+    /**
+     * Reload the complete item index.
+     *
+     * Called when a new remote items.json has been downloaded
+     * or when the user switches between LOCAL and REMOTE.
+     */
+    @Synchronized
+    fun reload() {
+
+        Log.d(
+            TAG,
+            "========================================"
+        )
+
+        Log.d(
+            TAG,
+            "RELOADING ITEM DATABASE"
+        )
+
+        Log.d(
+            TAG,
+            "========================================"
+        )
+
+        itemIndex.clear()
+
+        loadItems()
+
+        Log.d(
+            TAG,
+            "Reload complete. Items: ${itemIndex.size}"
+        )
+
+        Log.d(
+            TAG,
+            "========================================"
+        )
     }
 
     /**
@@ -305,19 +355,18 @@ class ItemMatcher(
     }
 
     /**
-     * Load Items from assets/items.json.
+     * Load items from the currently selected database.
+     *
+     * The actual source is handled by ItemDatabaseManager.
      */
     private fun loadItems() {
 
         try {
 
             val jsonText =
-                context.assets
-                    .open(ITEMS_FILE)
-                    .bufferedReader(Charsets.UTF_8)
-                    .use {
-                        it.readText()
-                    }
+                ItemDatabaseManager.getCurrentJson(
+                    context
+                )
 
             val jsonArray =
                 JSONArray(jsonText)
@@ -388,7 +437,6 @@ class ItemMatcher(
                         obj
                     )
 
-
                 itemIndex[
                     canonicalName
                 ] =
@@ -404,7 +452,7 @@ class ItemMatcher(
 
             Log.e(
                 TAG,
-                "Failed to load items.json",
+                "Failed to load items database",
                 e
             )
         }

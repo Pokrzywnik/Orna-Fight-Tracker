@@ -11,7 +11,7 @@ class FirstRunActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        title = "UPDATE 2.7 \uD83D\uDD25"
+        title = "UPDATE 2.8 \uD83D\uDD25"
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 40, 20, 40)
@@ -21,7 +21,9 @@ class FirstRunActivity : Activity() {
 
             setText(
                 """
-                • Added Automatic item Assess + renaming
+                • Item Assess v 1.2 - Faster and Lighter
+                • Updated internal items database for Riftfall items
+                • Added support for external database from url
                 
                 Click play button on bottom right to hide/show floating controller.
                 Use it to start/stop live Assess.
@@ -31,7 +33,7 @@ class FirstRunActivity : Activity() {
                 If you encounter any bugs - feel free to hit me up on discord - Frodo9382
                 
                 Important note:
-                Assess works only in english for now. Working on other languages.
+                Assess works only in english for now.
                 Some items may fail to asses. App try to assess items with adorns, 
                 but not all can provide accurate results.
                 """.trimIndent()

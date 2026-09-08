@@ -78,6 +78,27 @@ class ItemAssessmentPipeline(
         List<PaddleOcrRecognizer.RecognitionResult>
     )
 
+    /**
+     * Reload item database used by ItemMatcher.
+     *
+     * This allows changing items.json while the app is running,
+     * without recreating the whole OCR/assessment pipeline.
+     */
+    fun reloadItemDatabase() {
+
+        Log.d(
+            TAG,
+            "Reloading ItemMatcher database..."
+        )
+
+        matcher.reload()
+
+        Log.d(
+            TAG,
+            "ItemMatcher database reloaded"
+        )
+    }
+
     fun processAllExamples(): List<PipelineResult> {
 
         Log.d(TAG, "========================================")
