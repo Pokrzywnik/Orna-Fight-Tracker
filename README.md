@@ -9,7 +9,9 @@ FightTracker is an Android companion app for **Orna RPG** focused on:
 * Session statistics tracking
 
 The app uses Android MediaProjection + ML Kit OCR to detect rewards directly during game.
-
+<p align="center">
+<img src="screenshots/9.png" width="90%">
+</p>
 <p align="center">
   <img src="screenshots/1.png" width="30%">
   <img src="screenshots/2.png" width="30%">
