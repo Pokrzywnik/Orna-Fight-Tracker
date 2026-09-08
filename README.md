@@ -2,13 +2,15 @@
 
 FightTracker is an Android companion app for **Orna RPG** focused on:
 
+* Live Item Assess
 * Live reward tracking using OCR
 * Material forecast browsing
 * Daily material notifications
 * Tower + Codex quick access
 * Session statistics tracking
 
-The app uses Android MediaProjection + ML Kit OCR to detect rewards directly during game.
+The app uses Android MediaProjection + ML Kit OCR to detect rewards/assess items directly during game.
+
 <p align="center">
 <img src="screenshots/9.png" width="90%">
 </p>
@@ -26,9 +28,18 @@ The app uses Android MediaProjection + ML Kit OCR to detect rewards directly dur
   <img src="screenshots/7.png" width="30%">
   <img src="screenshots/8.png" width="30%">
 </p>
+
 ---
 
 # Features
+## OCR Live Item Assess
+FightTracker scans the screen using Android MediaProjection and:
+
+* Detects Item screen
+* Assess item showing overlay
+* Adds easy renaming - clicking overlay copies item name + quality%
+
+---
 
 ## OCR Reward Tracking
 
@@ -108,6 +119,12 @@ Notification system includes:
 
 ---
 
+## Monument Rewards
+
+Shows webview of Mr Truffles website that tracks monument rewards each week.
+
+---
+
 ## Aura System
 
 Tracked materials display custom animated aura overlays.
@@ -146,6 +163,7 @@ Quick-access embedded web views for:
 ## OCR
 
 * Google ML Kit Text Recognition
+* paddle paddle OCR
 
 ## UI
 
@@ -232,7 +250,12 @@ Original spreadsheet:
 
 [https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaOAi8/edit?gid=1635134007#gid=1635134007](https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaOAi8/edit?gid=1635134007#gid=1635134007)
 
+**Monuments rewards - https://floorchart.top/ by Mr Truffles  (dethplaque on discrod) 
+Aussie Codex - https://www.aussiescodex.com/ by AussiePlz (biscuitman on discord)
+Yaco Codex - https://codex.fqegg.top/ by FQEGG (fqegg on discord)**
+
 ---
+
 
 # Disclaimer
 
