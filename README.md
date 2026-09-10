@@ -2,14 +2,18 @@
 
 FightTracker is an Android companion app for **Orna RPG** focused on:
 
+* Live Item Assess
 * Live reward tracking using OCR
 * Material forecast browsing
 * Daily material notifications
 * Tower + Codex quick access
 * Session statistics tracking
 
-The app uses Android MediaProjection + ML Kit OCR to detect rewards directly during game.
+The app uses Android MediaProjection + ML Kit OCR to detect rewards/assess items directly during game.
 
+<p align="center">
+<img src="screenshots/9.png" width="90%">
+</p>
 <p align="center">
   <img src="screenshots/1.png" width="30%">
   <img src="screenshots/2.png" width="30%">
@@ -24,9 +28,18 @@ The app uses Android MediaProjection + ML Kit OCR to detect rewards directly dur
   <img src="screenshots/7.png" width="30%">
   <img src="screenshots/8.png" width="30%">
 </p>
+
 ---
 
 # Features
+## OCR Live Item Assess
+FightTracker scans the screen using paddle paddle OCR and:
+
+* Detects Item screen
+* Assess item showing overlay
+* Adds easy renaming - clicking overlay copies item name + quality%
+
+---
 
 ## OCR Reward Tracking
 
@@ -51,11 +64,10 @@ Uses:
 
 ## Floating Tracker Overlay
 
-Includes a floating overlay tracker that can:
+Includes a floating overlay tracker that:
 
-* Start/stop tracking quickly
 * Stay visible above Orna
-* Reduce the need to reopen the app
+* shows Last Reward/Total/Averange per minute orns, gold, xp and shards
 
 Requires:
 
@@ -80,10 +92,12 @@ Sources include:
 * Sparring
 * Trials
 * Towers
+* Towers (HoA)
 
 Users can:
 
 * Select targeted materials
+* select/deselect guilds to use
 * Highlight tracked materials with animated aura effects
 * Receive daily notifications if selected materials are available
 
@@ -103,6 +117,12 @@ Notification system includes:
 * Boot persistence
 * Notification channel support
 * Today/Tomorrow material matching
+
+---
+
+## Monument Rewards
+
+Shows webview of Mr Truffles website that tracks monument rewards each week.
 
 ---
 
@@ -144,6 +164,7 @@ Quick-access embedded web views for:
 ## OCR
 
 * Google ML Kit Text Recognition
+* paddle paddle OCR
 
 ## UI
 
@@ -175,6 +196,7 @@ The app uses the following permissions:
 * Android 10+
 * Notification permission
 * Overlay permission
+* Disabled battery optimalization (for longer sessions)
 
 ## Build
 
@@ -188,7 +210,15 @@ Open in Android Studio and run:
 
 # Credits
 
-Forecast data provided by:
+**Monuments rewards** - https://floorchart.top/ by Mr Truffles  (dethplaque on discord)
+
+**Aussie Codex** - https://www.aussiescodex.com/ by AussiePlz (biscuitman on discord)
+
+**Yaco Codex** - https://codex.fqegg.top/ by FQEGG (fqegg on discord)
+
+<br>
+
+**Forecast data provided by:**
 
 ## Data Entry
 
@@ -227,10 +257,10 @@ Forecast data provided by:
 * zexterior — Omnicracy
 
 Original spreadsheet:
-
 [https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaOAi8/edit?gid=1635134007#gid=1635134007](https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaOAi8/edit?gid=1635134007#gid=1635134007)
 
 ---
+
 
 # Disclaimer
 
