@@ -11,6 +11,7 @@ import ai.onnxruntime.*
 import java.nio.FloatBuffer
 import kotlin.math.max
 import kotlin.math.min
+import java.util.concurrent.ConcurrentHashMap
 
 
 
@@ -88,6 +89,8 @@ class PaddleOcrRecognizer(
         OrtEnvironment.getEnvironment()
 
     private val ortSession: OrtSession
+    private val activeRunOptions =
+        ConcurrentHashMap.newKeySet<OrtSession.RunOptions>()
 
     private val dictionary: List<String>
 
@@ -371,7 +374,33 @@ class PaddleOcrRecognizer(
                 shape
             )
 
+        /*
+         * Each individual ONNX call gets its own
+         * RunOptions instance.
+         */
+        val runOptions =
+            OrtSession.RunOptions()
+
+        activeRunOptions.add(runOptions)
+
         try {
+
+            /*
+             * Do not start an ONNX call if the worker
+             * has already been cancelled.
+             */
+            if (Thread.currentThread().isInterrupted) {
+
+                Log.d(
+                    TAG,
+                    "Recognizer worker already interrupted before ONNX inference"
+                )
+
+                return RecognitionResult(
+                    text = "",
+                    confidence = 0.0f
+                )
+            }
 
             tensor.use {
 
@@ -381,7 +410,8 @@ class PaddleOcrRecognizer(
                     )
 
                 ortSession.run(
-                    inputs
+                    inputs,
+                    runOptions
                 ).use { result ->
 
                     Log.d(
@@ -413,11 +443,21 @@ class PaddleOcrRecognizer(
 
         } catch (e: Exception) {
 
-            Log.e(
-                TAG,
-                "Recognition inference failed",
-                e
-            )
+            if (Thread.currentThread().isInterrupted) {
+
+                Log.d(
+                    TAG,
+                    "Recognition inference interrupted/cancelled"
+                )
+
+            } else {
+
+                Log.e(
+                    TAG,
+                    "Recognition inference failed",
+                    e
+                )
+            }
 
             return RecognitionResult(
                 text = "",
@@ -425,6 +465,10 @@ class PaddleOcrRecognizer(
             )
 
         } finally {
+
+            activeRunOptions.remove(runOptions)
+
+            runOptions.close()
 
             if (
                 inputBitmap !== bitmap &&
@@ -527,6 +571,20 @@ class PaddleOcrRecognizer(
             return emptyMap()
         }
 
+        /*
+         * Do not start another batch after this worker
+         * has been cancelled.
+         */
+        if (Thread.currentThread().isInterrupted) {
+
+            Log.d(
+                TAG,
+                "Batch inference skipped because worker is interrupted"
+            )
+
+            return emptyMap()
+        }
+
         val batchSize = batch.size
         val channelSize = TARGET_HEIGHT * bucketWidth
         val singleImageSize = 3 * channelSize
@@ -535,6 +593,16 @@ class PaddleOcrRecognizer(
             FloatArray(batchSize * singleImageSize)
 
         for ((batchIndex, prepared) in batch.withIndex()) {
+
+            if (Thread.currentThread().isInterrupted) {
+
+                Log.d(
+                    TAG,
+                    "Batch preparation interrupted"
+                )
+
+                return emptyMap()
+            }
 
             bitmapToFloatArrayPadded(
                 bitmap = prepared.bitmap,
@@ -562,41 +630,79 @@ class PaddleOcrRecognizer(
                 shape
             )
 
+        /*
+         * Each batch has its own RunOptions.
+         *
+         * cancelCurrentRuns() can terminate this exact
+         * native ONNX call.
+         */
+        val runOptions =
+            OrtSession.RunOptions()
+
+        activeRunOptions.add(runOptions)
+
         val decodedResults =
             try {
 
-                tensor.use {
+                if (Thread.currentThread().isInterrupted) {
 
-                    val inputs =
-                        mapOf(inputName to tensor)
+                    Log.d(
+                        TAG,
+                        "Batch worker interrupted before ONNX inference"
+                    )
 
-                    ortSession.run(inputs).use { result ->
+                    emptyList()
 
-                        if (result.size() == 0) {
+                } else {
 
-                            Log.e(
-                                TAG,
-                                "Recognizer returned no output"
+                    tensor.use {
+
+                        val inputs =
+                            mapOf(
+                                inputName to tensor
                             )
 
-                            emptyList()
+                        ortSession.run(
+                            inputs,
+                            runOptions
+                        ).use { result ->
 
-                        } else {
+                            if (result.size() == 0) {
 
-                            decodeBatchOutput(
-                                result[0].value
-                            )
+                                Log.e(
+                                    TAG,
+                                    "Recognizer returned no output"
+                                )
+
+                                emptyList()
+
+                            } else {
+
+                                decodeBatchOutput(
+                                    result[0].value
+                                )
+                            }
                         }
                     }
                 }
 
             } catch (e: Exception) {
 
-                Log.e(
-                    TAG,
-                    "Batch recognition inference failed",
-                    e
-                )
+                if (Thread.currentThread().isInterrupted) {
+
+                    Log.d(
+                        TAG,
+                        "Batch recognition inference interrupted/cancelled"
+                    )
+
+                } else {
+
+                    Log.e(
+                        TAG,
+                        "Batch recognition inference failed",
+                        e
+                    )
+                }
 
                 List(batchSize) {
                     RecognitionResult(
@@ -604,7 +710,29 @@ class PaddleOcrRecognizer(
                         confidence = 0.0f
                     )
                 }
+
+            } finally {
+
+                activeRunOptions.remove(runOptions)
+
+                runOptions.close()
+
+                tensor.close()
             }
+
+        /*
+         * If this worker was cancelled, do not map
+         * partial/invalid results back into the pipeline.
+         */
+        if (Thread.currentThread().isInterrupted) {
+
+            Log.d(
+                TAG,
+                "Batch results discarded because worker is interrupted"
+            )
+
+            return emptyMap()
+        }
 
         val byIndex =
             mutableMapOf<Int, RecognitionResult>()
@@ -648,166 +776,396 @@ class PaddleOcrRecognizer(
          */
         val prepStart = System.nanoTime()
 
-        val prepared = mutableListOf<PreparedCrop>()
+        val prepared =
+            mutableListOf<PreparedCrop>()
 
-        for ((index, box) in boxes.withIndex()) {
+        try {
 
-            val crop = cropTextBox(source, box)
+            for ((index, box) in boxes.withIndex()) {
 
-            if (crop == null) {
-                Log.w(TAG, "BOX $index: crop failed")
-                continue
-            }
+                if (Thread.currentThread().isInterrupted) {
 
-            try {
-
-                val resized = resizeForRecognition(crop)
-
-                prepared.add(
-                    PreparedCrop(
-                        index = index,
-                        bitmap = resized,
-                        box = box
+                    Log.d(
+                        TAG,
+                        "OCR crop preparation cancelled"
                     )
-                )
 
-            } finally {
+                    break
+                }
 
-                if (!crop.isRecycled) {
-                    crop.recycle()
+                val crop =
+                    cropTextBox(
+                        source,
+                        box
+                    )
+
+                if (crop == null) {
+
+                    Log.w(
+                        TAG,
+                        "BOX $index: crop failed"
+                    )
+
+                    continue
+                }
+
+                try {
+
+                    if (Thread.currentThread().isInterrupted) {
+
+                        Log.d(
+                            TAG,
+                            "OCR cancelled while preparing crop"
+                        )
+
+                        break
+                    }
+
+                    val resized =
+                        resizeForRecognition(
+                            crop
+                        )
+
+                    prepared.add(
+                        PreparedCrop(
+                            index = index,
+                            bitmap = resized,
+                            box = box
+                        )
+                    )
+
+                } finally {
+
+                    if (!crop.isRecycled) {
+                        crop.recycle()
+                    }
                 }
             }
-        }
 
-        val prepMs =
-            (System.nanoTime() - prepStart) / 1_000_000.0
+            val prepMs =
+                (System.nanoTime() - prepStart) / 1_000_000.0
 
-        Log.d(TAG, "OCR PREP: %.2f ms".format(prepMs))
-
-        if (prepared.isEmpty()) {
-            return boxes.map {
-                RecognitionResult(
-                    text = "",
-                    confidence = 0.0f,
-                    box = it
+            Log.d(
+                TAG,
+                "OCR PREP: %.2f ms".format(
+                    prepMs
                 )
-            }
-        }
+            )
 
-        /*
-         * ----------------------------------------
-         * 2. GROUP CROPS BY WIDTH BUCKET
-         * ----------------------------------------
-         *
-         * All images in one ONNX tensor must share
-         * the same width, but padding everything to
-         * the single widest box wastes most of the
-         * tensor. Group by bucket and run one
-         * inference per bucket.
-         */
-        val bucketStart = System.nanoTime()
+            if (
+                prepared.isEmpty() ||
+                Thread.currentThread().isInterrupted
+            ) {
 
-        val byBucket =
-            prepared.groupBy {
-                bucketFor(it.bitmap.width)
+                return boxes.map {
+                    RecognitionResult(
+                        text = "",
+                        confidence = 0.0f,
+                        box = it
+                    )
+                }
             }
 
-        val bucketMs =
-            (System.nanoTime() - bucketStart) / 1_000_000.0
+            /*
+             * ----------------------------------------
+             * 2. GROUP CROPS BY WIDTH BUCKET
+             * ----------------------------------------
+             */
+            val bucketStart =
+                System.nanoTime()
 
-        Log.d(
-            TAG,
-            "OCR BUCKETS: " +
-                    byBucket.entries
-                        .sortedBy { it.key }
-                        .joinToString(", ") {
-                            "${it.key}(${it.value.size})"
-                        }
-        )
+            val byBucket =
+                prepared.groupBy {
+                    bucketFor(
+                        it.bitmap.width
+                    )
+                }
 
-        Log.d(TAG, "BUCKET PREP: %.2f ms".format(bucketMs))
+            val bucketMs =
+                (System.nanoTime() - bucketStart) /
+                        1_000_000.0
 
-        /*
-         * ----------------------------------------
-         * 3. INFERENCE PER BUCKET / CHUNK
-         * ----------------------------------------
-         */
-        val inferenceStart = System.nanoTime()
+            Log.d(
+                TAG,
+                "OCR BUCKETS: " +
+                        byBucket.entries
+                            .sortedBy {
+                                it.key
+                            }
+                            .joinToString(", ") {
+                                "${it.key}(${it.value.size})"
+                            }
+            )
 
-        val decodedByIndex =
-            mutableMapOf<Int, RecognitionResult>()
+            Log.d(
+                TAG,
+                "BUCKET PREP: %.2f ms".format(
+                    bucketMs
+                )
+            )
 
-        for ((bucketWidth, group) in byBucket) {
+            /*
+             * ----------------------------------------
+             * 3. INFERENCE PER BUCKET / CHUNK
+             * ----------------------------------------
+             */
+            val inferenceStart =
+                System.nanoTime()
 
-            for (chunk in group.chunked(maxBatchFor(bucketWidth))) {
+            val decodedByIndex =
+                mutableMapOf<Int, RecognitionResult>()
+
+            for (
+            (bucketWidth, group)
+            in byBucket
+            ) {
+
+                /*
+                 * IMPORTANT:
+                 *
+                 * A cancelled worker must not start
+                 * another bucket.
+                 */
+                if (Thread.currentThread().isInterrupted) {
+
+                    Log.d(
+                        TAG,
+                        "OCR cancelled before next bucket"
+                    )
+
+                    break
+                }
+
+                val chunks =
+                    group.chunked(
+                        maxBatchFor(
+                            bucketWidth
+                        )
+                    )
+
+                for (chunk in chunks) {
+
+                    /*
+                     * IMPORTANT:
+                     *
+                     * This prevents a cancelled old worker
+                     * from continuing with another batch after
+                     * its previous native ONNX call was terminated.
+                     */
+                    if (Thread.currentThread().isInterrupted) {
+
+                        Log.d(
+                            TAG,
+                            "OCR cancelled before next batch"
+                        )
+
+                        break
+                    }
+
+                    Log.d(
+                        TAG,
+                        "RUN BATCH: " +
+                                "bucket=$bucketWidth " +
+                                "size=${chunk.size}"
+                    )
+
+                    val batchResults =
+                        runBatchInference(
+                            batch = chunk,
+                            bucketWidth = bucketWidth
+                        )
+
+                    /*
+                     * If the ONNX call was terminated,
+                     * runBatchInference() returns emptyMap().
+                     *
+                     * Also check thread interruption so
+                     * the old worker stops immediately.
+                     */
+                    if (
+                        Thread.currentThread().isInterrupted
+                    ) {
+
+                        Log.d(
+                            TAG,
+                            "OCR worker interrupted after batch cancellation"
+                        )
+
+                        break
+                    }
+
+                    decodedByIndex.putAll(
+                        batchResults
+                    )
+                }
+
+                if (Thread.currentThread().isInterrupted) {
+                    break
+                }
+            }
+
+            val inferenceMs =
+                (System.nanoTime() - inferenceStart) /
+                        1_000_000.0
+
+            Log.d(
+                TAG,
+                "OCR INFERENCE: %.2f ms".format(
+                    inferenceMs
+                )
+            )
+
+            /*
+             * If the whole OCR worker was cancelled,
+             * don't continue with result processing.
+             */
+            if (Thread.currentThread().isInterrupted) {
 
                 Log.d(
                     TAG,
-                    "RUN BATCH: bucket=$bucketWidth size=${chunk.size}"
+                    "OCR pipeline cancelled"
                 )
 
-                decodedByIndex.putAll(
-                    runBatchInference(
-                        batch = chunk,
-                        bucketWidth = bucketWidth
+                return boxes.map {
+                    RecognitionResult(
+                        text = "",
+                        confidence = 0.0f,
+                        box = it
                     )
+                }
+            }
+
+            /*
+             * ----------------------------------------
+             * 4. MAP RESULTS BACK TO ORIGINAL BOXES
+             * ----------------------------------------
+             */
+            val results =
+                MutableList(
+                    boxes.size
+                ) {
+
+                    RecognitionResult(
+                        text = "",
+                        confidence = 0.0f,
+                        box = boxes[it]
+                    )
+                }
+
+            for (preparedItem in prepared) {
+
+                val decoded =
+                    decodedByIndex[
+                        preparedItem.index
+                    ]
+
+                if (decoded != null) {
+
+                    results[
+                        preparedItem.index
+                    ] =
+                        decoded.copy(
+                            box = preparedItem.box
+                        )
+                }
+            }
+
+            /*
+             * ----------------------------------------
+             * 5. FINISH
+             * ----------------------------------------
+             */
+            val totalMs =
+                (System.nanoTime() - totalStart) /
+                        1_000_000.0
+
+            Log.d(
+                TAG,
+                "========================================"
+            )
+
+            Log.d(
+                TAG,
+                "BATCH OCR FINISHED"
+            )
+
+            Log.d(
+                TAG,
+                "RESULTS: ${results.size}"
+            )
+
+            Log.d(
+                TAG,
+                "OCR TOTAL: %.2f ms".format(
+                    totalMs
+                )
+            )
+
+            Log.d(
+                TAG,
+                "========================================"
+            )
+
+            return results
+
+        } finally {
+
+            /*
+             * ALWAYS recycle prepared bitmaps.
+             *
+             * This is particularly important when
+             * cancellation happens halfway through OCR.
+             */
+            for (item in prepared) {
+
+                if (!item.bitmap.isRecycled) {
+                    item.bitmap.recycle()
+                }
+            }
+        }
+    }
+
+    fun cancelCurrentRuns() {
+
+        val runs =
+            activeRunOptions.toList()
+
+        if (runs.isEmpty()) {
+
+            Log.d(
+                TAG,
+                "No active recognizer ONNX runs to cancel"
+            )
+
+            return
+        }
+
+        Log.d(
+            TAG,
+            "Requesting termination of " +
+                    "${runs.size} recognizer ONNX run(s)"
+        )
+
+        for (runOptions in runs) {
+
+            try {
+
+                runOptions.setTerminate(true)
+
+            } catch (e: Exception) {
+
+                Log.e(
+                    TAG,
+                    "Failed to terminate recognizer ONNX run",
+                    e
                 )
             }
         }
 
-        val inferenceMs =
-            (System.nanoTime() - inferenceStart) / 1_000_000.0
-
-        Log.d(TAG, "OCR INFERENCE: %.2f ms".format(inferenceMs))
-
-        /*
-         * ----------------------------------------
-         * 4. MAP RESULTS BACK TO ORIGINAL BOXES
-         * ----------------------------------------
-         */
-        val results =
-            MutableList(boxes.size) {
-                RecognitionResult(
-                    text = "",
-                    confidence = 0.0f,
-                    box = boxes[it]
-                )
-            }
-
-        for (preparedItem in prepared) {
-
-            val decoded =
-                decodedByIndex[preparedItem.index]
-
-            if (decoded != null) {
-
-                results[preparedItem.index] =
-                    decoded.copy(box = preparedItem.box)
-            }
-        }
-
-        /*
-         * ----------------------------------------
-         * 5. CLEANUP
-         * ----------------------------------------
-         */
-        for (item in prepared) {
-
-            if (!item.bitmap.isRecycled) {
-                item.bitmap.recycle()
-            }
-        }
-
-        val totalMs =
-            (System.nanoTime() - totalStart) / 1_000_000.0
-
-        Log.d(TAG, "========================================")
-        Log.d(TAG, "BATCH OCR FINISHED")
-        Log.d(TAG, "RESULTS: ${results.size}")
-        Log.d(TAG, "OCR TOTAL: %.2f ms".format(totalMs))
-        Log.d(TAG, "========================================")
-
-        return results
+        Log.d(
+            TAG,
+            "Recognizer ONNX termination requested"
+        )
     }
 
     /**

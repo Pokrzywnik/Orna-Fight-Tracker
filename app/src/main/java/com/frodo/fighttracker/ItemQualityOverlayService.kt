@@ -109,7 +109,15 @@ class ItemQualityOverlayService : Service() {
     ): String {
 
         val qualityText =
-            if (!exactQuality.isNaN()) {
+            if (
+                exactQuality.isNaN() &&
+                qualityMin == 0.0 &&
+                qualityMax == 0.0
+            ) {
+
+                "Unknown"
+
+            } else if (!exactQuality.isNaN()) {
 
                 "%.0f%%".format(
                     exactQuality * 100.0
@@ -692,6 +700,14 @@ class ItemQualityOverlayService : Service() {
     ): String {
 
         return if (
+            exactQuality.isNaN() &&
+            qualityMin == 0.0 &&
+            qualityMax == 0.0
+        ) {
+
+            "Unknown"
+
+        } else if (
             !exactQuality.isNaN()
         ) {
 

@@ -279,6 +279,8 @@ class ItemAssessmentCaptureService : Service() {
 
         if (!isCapturing) {
 
+            startForegroundServiceNotification()
+
             startProjection(
                 resultCode,
                 projectionData
@@ -952,6 +954,50 @@ class ItemAssessmentCaptureService : Service() {
      */
     private fun cancelCurrentAssessment() {
 
+        /*
+         * NAJPIERW zatrzymujemy natywne ONNX Runtime.
+         *
+         * Future.cancel(true) przerywa wątek Javy, ale samo w sobie
+         * nie gwarantuje natychmiastowego przerwania ortSession.run().
+         *
+         * Pipeline ma własne RunOptions dla aktywnych inference.
+         * setTerminate(true) wysyła bezpośrednią prośbę do ONNX Runtime
+         * o zakończenie aktualnego inference.
+         */
+        if (::pipeline.isInitialized) {
+
+            Log.d(
+                TAG,
+                "Requesting ONNX inference termination"
+            )
+
+            try {
+
+                pipeline.cancelCurrentInference()
+
+            } catch (e: Exception) {
+
+                Log.e(
+                    TAG,
+                    "Failed to cancel current ONNX inference",
+                    e
+                )
+            }
+
+        } else {
+
+            Log.d(
+                TAG,
+                "Pipeline not initialized - no ONNX inference to cancel"
+            )
+        }
+
+        /*
+         * Następnie anulujemy worker Javy.
+         *
+         * To nadal jest potrzebne, ponieważ po wyjściu z ONNX
+         * worker może wykonywać jeszcze kod Kotlin/Java.
+         */
         val future =
             currentAssessmentFuture
 

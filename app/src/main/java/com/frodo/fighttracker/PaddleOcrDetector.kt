@@ -9,6 +9,7 @@ import java.nio.FloatBuffer
 import kotlin.math.max
 import kotlin.math.min
 
+
 class PaddleOcrDetector(
     private val context: Context
 ) {
@@ -75,6 +76,8 @@ class PaddleOcrDetector(
         OrtEnvironment.getEnvironment()
 
     private val ortSession: OrtSession
+    @Volatile
+    private var activeRunOptions: OrtSession.RunOptions? = null
 
     init {
 
@@ -179,9 +182,37 @@ class PaddleOcrDetector(
                 shape
             )
 
+        /*
+         * IMPORTANT:
+         *
+         * RunOptions is created specifically for this
+         * individual ONNX inference.
+         *
+         * cancelCurrentRun() can call setTerminate(true)
+         * on this exact run.
+         */
+        val runOptions =
+            OrtSession.RunOptions()
+
+        activeRunOptions = runOptions
+
         val detectorOutput: DetectorOutput
 
         try {
+
+            /*
+             * If cancellation happened before the actual
+             * ONNX call, do not start inference.
+             */
+            if (Thread.currentThread().isInterrupted) {
+
+                Log.d(
+                    TAG,
+                    "Detector worker already interrupted before ONNX inference"
+                )
+
+                return emptyList()
+            }
 
             tensor.use {
 
@@ -190,7 +221,16 @@ class PaddleOcrDetector(
                         inputName to tensor
                     )
 
-                ortSession.run(inputs).use { result ->
+                ortSession.run(
+                    inputs,
+                    runOptions
+                ).use { result ->
+
+                    /*
+                     * ONNX termination normally causes run()
+                     * to throw/return an exception. We handle
+                     * that below.
+                     */
 
                     if (result.size() == 0) {
 
@@ -212,19 +252,55 @@ class PaddleOcrDetector(
 
         } catch (e: Exception) {
 
-            Log.e(
-                TAG,
-                "Detector inference failed",
-                e
-            )
+            if (Thread.currentThread().isInterrupted) {
+
+                Log.d(
+                    TAG,
+                    "Detector inference interrupted/cancelled"
+                )
+
+            } else {
+
+                Log.e(
+                    TAG,
+                    "Detector inference failed",
+                    e
+                )
+            }
 
             return emptyList()
 
         } finally {
 
+            /*
+             * Only clear the reference if it still points
+             * to THIS run.
+             */
+            if (activeRunOptions === runOptions) {
+                activeRunOptions = null
+            }
+
+            runOptions.close()
+
             if (!resizedBitmap.isRecycled) {
                 resizedBitmap.recycle()
             }
+        }
+
+        /*
+         * The native ONNX call is finished at this point.
+         *
+         * If the worker was cancelled while ONNX was
+         * terminating, do not continue into DB post-processing.
+         */
+        if (Thread.currentThread().isInterrupted) {
+
+            Log.d(
+                TAG,
+                "Detector cancelled after ONNX inference"
+            )
+
+            return emptyList()
         }
 
         Log.d(
@@ -292,6 +368,45 @@ class PaddleOcrDetector(
         return boxes
     }
 
+
+    fun cancelCurrentRun() {
+
+        val runOptions =
+            activeRunOptions
+
+        if (runOptions == null) {
+
+            Log.d(
+                TAG,
+                "No active detector ONNX run to cancel"
+            )
+
+            return
+        }
+
+        try {
+
+            Log.d(
+                TAG,
+                "Requesting detector ONNX termination"
+            )
+
+            runOptions.setTerminate(true)
+
+            Log.d(
+                TAG,
+                "Detector ONNX termination requested"
+            )
+
+        } catch (e: Exception) {
+
+            Log.e(
+                TAG,
+                "Failed to terminate detector ONNX run",
+                e
+            )
+        }
+    }
     /**
      * Extract ONNX output.
      *

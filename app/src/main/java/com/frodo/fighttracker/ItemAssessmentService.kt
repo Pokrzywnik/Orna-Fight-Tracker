@@ -271,105 +271,107 @@
                 1000L
             )
         }
-    
+
         private fun captureAndAssess() {
-    
+
             if (processing) {
-    
+
                 Log.d(
                     TAG,
                     "Previous scan still processing"
                 )
-    
+
                 return
             }
-    
+
             val reader =
                 imageReader
                     ?: return
-    
+
             val image =
                 reader.acquireLatestImage()
                     ?: run {
-    
+
                         Log.d(
                             TAG,
                             "No image available"
                         )
-    
+
                         return
                     }
-    
+
             processing = true
-    
+
+            var bitmap: Bitmap? = null
+
             try {
-    
-                val bitmap =
+
+                bitmap =
                     imageToBitmap(image)
-    
+
                 image.close()
-    
+
                 if (bitmap == null) {
-    
+
                     Log.e(
                         TAG,
                         "Could not convert Image to Bitmap"
                     )
-    
+
                     return
                 }
-    
+
                 Log.d(
                     TAG,
-                    "SCREENSHOT: ${bitmap.width}x${bitmap.height}"
+                    "SCREENSHOT: ${bitmap!!.width}x${bitmap!!.height}"
                 )
-    
+
                 val result =
                     pipeline.processBitmap(
-                        bitmap
+                        bitmap!!
                     )
-    
+
                 if (
                     result.item != null &&
                     result.assessment != null
                 ) {
-    
+
                     val assessment =
                         result.assessment
-    
+
                     Log.d(
                         TAG,
                         "================================"
                     )
-    
+
                     Log.d(
                         TAG,
                         "ITEM DETECTED"
                     )
-    
+
                     Log.d(
                         TAG,
                         "ITEM: ${assessment.itemName}"
                     )
-    
+
                     Log.d(
                         TAG,
                         "LEVEL: ${assessment.upgradeLevel}"
                     )
-    
+
                     if (
                         assessment.exactQuality != null
                     ) {
-    
+
                         Log.d(
                             TAG,
                             "QUALITY: %.2f%%".format(
                                 assessment.exactQuality * 100.0
                             )
                         )
-    
+
                     } else {
-    
+
                         Log.d(
                             TAG,
                             "QUALITY RANGE: %.2f%% - %.2f%%".format(
@@ -378,32 +380,36 @@
                             )
                         )
                     }
-    
+
                     Log.d(
                         TAG,
                         "================================"
                     )
-    
+
                 } else {
-    
+
                     Log.d(
                         TAG,
                         "No item detected"
                     )
                 }
-    
-                bitmap.recycle()
-    
+
             } catch (e: Exception) {
-    
+
                 Log.e(
                     TAG,
                     "Error during item assessment",
                     e
                 )
-    
+
             } finally {
-    
+
+                bitmap?.let {
+                    if (!it.isRecycled) {
+                        it.recycle()
+                    }
+                }
+
                 processing = false
             }
         }

@@ -21,9 +21,10 @@ class FirstRunActivity : Activity() {
 
             setText(
                 """
-                • Item Assess v 1.2 - Faster and Lighter
-                • Updated internal items database for Riftfall items
-                • Added support for external database from url
+                • HotFix Boss Scaling in Item Assess 
+                • Fixed bug displaying 0-0% range when unknown
+                • Fixed few crashes on samsung and pixel devices
+                • Fixed memory leaks
                 
                 Click play button on bottom right to hide/show floating controller.
                 Use it to start/stop live Assess.

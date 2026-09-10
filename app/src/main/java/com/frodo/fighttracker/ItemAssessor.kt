@@ -342,17 +342,23 @@ class ItemAssessor {
  * In that case NORMAL is clearly the correct model.
  */
 
+        /*
+ * ------------------------------------------------------------
+ * SCALING SELECTION
+ * ------------------------------------------------------------
+ *
+ * Normal items:
+ *   normally use NORMAL scaling.
+ *   If NORMAL gives no result, try BOSS scaling.
+ *
+ * Boss items:
+ *   test both BOSS and NORMAL scaling and use whichever
+ *   explains more OCR stats.
+ */
         if (isBoss) {
 
-            Log.d(
-                TAG,
-                "========================================"
-            )
-
-            Log.d(
-                TAG,
-                "TESTING BOSS VS NORMAL SCALING"
-            )
+            Log.d(TAG, "========================================")
+            Log.d(TAG, "TESTING BOSS VS NORMAL SCALING")
 
             /*
              * --------------------------------------------------------
@@ -382,10 +388,6 @@ class ItemAssessor {
                     isBossScaling = false
                 )
 
-            /*
-             * Number of OCR stats which can actually be explained
-             * by each scaling model.
-             */
             val bossSupport =
                 bossQuality?.matchingStats ?: 0
 
@@ -412,33 +414,22 @@ class ItemAssessor {
             )
 
             /*
-             * --------------------------------------------------------
-             * SELECT BEST SCALING
-             * --------------------------------------------------------
+             * Prefer the scaling which explains more stats.
              *
-             * Prefer the model which explains more stats.
-             *
-             * If both explain exactly the same number of stats,
-             * prefer the original boss classification.
+             * If equal, keep the original boss classification.
              */
-
             val useNormalScaling =
                 normalSupport > bossSupport
 
             if (useNormalScaling) {
 
-                Log.d(
-                    TAG,
-                    "SCALING DECISION: NORMAL"
-                )
+                Log.d(TAG, "SCALING DECISION: NORMAL")
 
                 commonQuality =
                     normalQuality
 
                 /*
-                 * Recalculate StatQuality objects using
-                 * normal scaling so that the displayed per-stat
-                 * values also agree with the selected model.
+                 * Recalculate per-stat qualities using NORMAL scaling.
                  */
                 statQualities.clear()
 
@@ -468,19 +459,101 @@ class ItemAssessor {
 
             } else {
 
-                Log.d(
-                    TAG,
-                    "SCALING DECISION: BOSS"
-                )
+                Log.d(TAG, "SCALING DECISION: BOSS")
 
                 commonQuality =
                     bossQuality
             }
 
-            Log.d(
-                TAG,
-                "========================================"
-            )
+            Log.d(TAG, "========================================")
+
+        } else {
+
+            /*
+             * --------------------------------------------------------
+             * NORMAL ITEM
+             * --------------------------------------------------------
+             *
+             * Normally we use NORMAL scaling.
+             *
+             * However, some normal mobs can drop items whose stats
+             * actually use BOSS scaling.
+             *
+             * Therefore:
+             *
+             *   NORMAL works -> keep NORMAL
+             *   NORMAL fails -> try BOSS
+             */
+
+            if (commonQuality == null) {
+
+                Log.d(TAG, "========================================")
+                Log.d(TAG, "NORMAL SCALING FAILED - TESTING BOSS SCALING")
+
+                val bossQuality =
+                    findBestCommonQuality(
+                        actualStats = actualStats,
+                        item = item,
+                        upgradeLevel = upgradeLevel,
+                        isBossScaling = true
+                    )
+
+                if (bossQuality != null) {
+
+                    Log.d(
+                        TAG,
+                        "BOSS FALLBACK RESULT: " +
+                                "${bossQuality.minQuality}-${bossQuality.maxQuality}% " +
+                                "support=${bossQuality.matchingStats}"
+                    )
+
+                    commonQuality =
+                        bossQuality
+
+                    /*
+                     * Recalculate per-stat qualities using BOSS scaling.
+                     */
+                    statQualities.clear()
+
+                    for ((statName, actualValue) in actualStats) {
+
+                        val baseValue =
+                            item.baseStats[statName]
+                                ?: continue
+
+                        val allowedQualityRange =
+                            getQualityRange(quality)
+
+                        val statQuality =
+                            calculateStatQuality(
+                                statName = statName,
+                                actualValue = actualValue,
+                                baseValue = baseValue,
+                                upgradeLevel = upgradeLevel,
+                                isBoss = true,
+                                allowedQualityRange = allowedQualityRange
+                            )
+
+                        if (statQuality != null) {
+                            statQualities.add(statQuality)
+                        }
+                    }
+
+                    Log.d(
+                        TAG,
+                        "SCALING DECISION: BOSS FALLBACK"
+                    )
+
+                } else {
+
+                    Log.d(
+                        TAG,
+                        "BOSS FALLBACK ALSO FAILED"
+                    )
+                }
+
+                Log.d(TAG, "========================================")
+            }
         }
 
         /*

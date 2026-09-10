@@ -416,6 +416,12 @@ class FightTrackerService : Service() {
         return Rect(bestX, bestStartY, bestX + 1, bestStartY + bestRun)
     }
 
+    private fun recycleBitmapSafe(bitmap: Bitmap?) {
+        if (bitmap != null && !bitmap.isRecycled) {
+            bitmap.recycle()
+        }
+    }
+
     private fun scanScreen() {
 
         if (SettingsStore.getLegacyOcr(this)) {
@@ -605,361 +611,802 @@ class FightTrackerService : Service() {
 
     private fun scanScreenModern() {
 
-//        if (ocrBusy)
-//            return
+        // do not run next OCR, if previous
+        // still doing first or second pass.
+        if (ocrBusy) {
+            return
+        }
 
         ocrBusy = true
 
-        val image: Image =
-            imageReader?.acquireLatestImage() ?: return
+        var fullBitmap: Bitmap? = null
+        var croppedBitmap: Bitmap? = null
 
-        val plane = image.planes[0]
-        val buffer: ByteBuffer = plane.buffer
+        try {
 
-        val pixelStride = plane.pixelStride
-        val rowStride = plane.rowStride
-        val rowPadding = rowStride - pixelStride * image.width
-
-        val fullBitmap = Bitmap.createBitmap(
-            image.width + rowPadding / pixelStride,
-            image.height,
-            Bitmap.Config.ARGB_8888
-        )
-
-        fullBitmap.copyPixelsFromBuffer(buffer)
-        image.close()
-
-        // 1. LOAD USER CROP (0..1)
-
-        val savedCrop = CropStore.load(this)
-
-        val crop = savedCrop ?: RectF(0.2f, 0.2f, 0.8f, 0.8f)
-
-        val left = (crop.left * fullBitmap.width).toInt()
-        val top = (crop.top * fullBitmap.height).toInt()
-        val right = (crop.right * fullBitmap.width).toInt()
-        val bottom = (crop.bottom * fullBitmap.height).toInt()
-
-        DebugOverlayData.userCropLeft = left
-        DebugOverlayData.userCropRight = right
-        DebugOverlayData.userCropTop = top
-        DebugOverlayData.userCropBottom = bottom
-
-        val width = (right - left).coerceAtLeast(1)
-        val height = (bottom - top).coerceAtLeast(1)
-
-        val croppedBitmap = Bitmap.createBitmap(
-            fullBitmap,
-            left,
-            top,
-            width,
-            height
-        )
-
-        // Remember user's crop for debug overlay
-        OcrDebugBuffer.userCrop = android.graphics.Rect(
-            left,
-            top,
-            right,
-            bottom
-        )
-
-        // FIRST OCR PASS - FIND REWARD ROWS
-
-
-        val firstInput = InputImage.fromBitmap(
-            croppedBitmap,
-            0
-        )
-
-        recognizer.process(firstInput)
-            .addOnSuccessListener { firstVisionText ->
-
-                var xpRect: Rect? = null
-                var goldRectFirstPass: Rect? = null
-
-                // Locate both XP and Gold text lines
-                for (block in firstVisionText.textBlocks) {
-                    for (line in block.lines) {
-                        val txt = line.text.lowercase()
-                        val box = line.boundingBox ?: continue
-
-                        if (box.top < 80) continue
-
-                        if (txt.contains("xp") || txt.contains("experience") ||
-                            txt.contains("doświadczenia") || txt.contains("drużynowego")) {
-                            xpRect = box
-                        }
-
-                        if ((txt.contains("gold") && !txt.contains("kingdom")) ||
-                            ((txt.contains("ouro") || txt.contains("0uro")) && !txt.contains("reino")) ||
-                            ((txt.contains("zlota") || txt.contains("złota") || txt.contains("złtota")) && !txt.contains("królestwa"))) {
-                            goldRectFirstPass = box
-                        }
+            val image: Image =
+                imageReader?.acquireLatestImage()
+                    ?: run {
+                        ocrBusy = false
+                        return
                     }
+
+            try {
+
+                val plane = image.planes[0]
+                val buffer: ByteBuffer = plane.buffer
+
+                val pixelStride = plane.pixelStride
+                val rowStride = plane.rowStride
+                val rowPadding =
+                    rowStride - pixelStride * image.width
+
+                fullBitmap = Bitmap.createBitmap(
+                    image.width + rowPadding / pixelStride,
+                    image.height,
+                    Bitmap.Config.ARGB_8888
+                )
+
+                buffer.rewind()
+
+                fullBitmap!!.copyPixelsFromBuffer(buffer)
+
+            } finally {
+
+                image.close()
+            }
+
+            // 1. LOAD USER CROP (0..1)
+
+            val savedCrop = CropStore.load(this)
+
+            val crop =
+                savedCrop ?: RectF(
+                    0.2f,
+                    0.2f,
+                    0.8f,
+                    0.8f
+                )
+
+            val full = fullBitmap
+                ?: run {
+                    ocrBusy = false
+                    return
                 }
 
-                var adjustedLeft = 0
+            val left =
+                (crop.left * full.width).toInt()
 
-                // Fallback baseline text pointer if pixel scan misses completely
-                val baseTextLeft = when {
-                    goldRectFirstPass != null -> goldRectFirstPass.left
-                    xpRect != null -> xpRect!!.left
-                    else -> 0
-                }
+            val top =
+                (crop.top * full.height).toInt()
 
-                // If Gold row is identified, find its yellow icon batch
-                if (goldRectFirstPass != null) {
-                    val w = croppedBitmap.width
-                    val h = croppedBitmap.height
-                    val pixels = IntArray(w * h)
-                    croppedBitmap.getPixels(pixels, 0, w, 0, 0, w, h)
+            val right =
+                (crop.right * full.width).toInt()
 
-                    val searchLeft = 0
-                    val searchRight = max(1, goldRectFirstPass.left - 5)
-                    val centerY = goldRectFirstPass.centerY()
-                    val searchTop = max(0, centerY - 30)
-                    val searchBottom = min(h, centerY + 30)
+            val bottom =
+                (crop.bottom * full.height).toInt()
 
-                    var bestX = -1
-                    var bestRun = 0
+            DebugOverlayData.userCropLeft = left
+            DebugOverlayData.userCropRight = right
+            DebugOverlayData.userCropTop = top
+            DebugOverlayData.userCropBottom = bottom
 
-                    for (x in searchLeft until searchRight) {
-                        var run = 0
-                        for (y in searchTop until searchBottom) {
-                            val c = pixels[y * w + x]
-                            val r = (c shr 16) and 255
-                            val g = (c shr 8) and 255
-                            val b = c and 255
+            val width =
+                (right - left).coerceAtLeast(1)
 
-                            // Looking for the vibrant yellow color profile of the gold coin/pouch icon
-                            val isYellow = r >= 160 && g >= 140 && b <= 90 && (r - b) >= 70
+            val height =
+                (bottom - top).coerceAtLeast(1)
 
-                            if (isYellow) {
-                                run++
-                                if (run > bestRun) {
-                                    bestRun = run
-                                    bestX = x
+            croppedBitmap =
+                Bitmap.createBitmap(
+                    full,
+                    left,
+                    top,
+                    width,
+                    height
+                )
+
+            // Remember user's crop for debug overlay
+            OcrDebugBuffer.userCrop =
+                android.graphics.Rect(
+                    left,
+                    top,
+                    right,
+                    bottom
+                )
+
+            // FIRST OCR PASS - FIND REWARD ROWS
+
+            val firstInput =
+                InputImage.fromBitmap(
+                    croppedBitmap!!,
+                    0
+                )
+
+            recognizer.process(firstInput)
+
+                .addOnSuccessListener { firstVisionText ->
+
+                    var finalBitmap: Bitmap? = null
+                    var scaledBitmap: Bitmap? = null
+
+                    try {
+
+                        var xpRect: Rect? = null
+                        var goldRectFirstPass: Rect? = null
+
+                        // Locate both XP and Gold text lines
+                        for (block in firstVisionText.textBlocks) {
+
+                            for (line in block.lines) {
+
+                                val txt =
+                                    line.text.lowercase()
+
+                                val box =
+                                    line.boundingBox
+                                        ?: continue
+
+                                if (box.top < 80)
+                                    continue
+
+                                if (
+                                    txt.contains("xp") ||
+                                    txt.contains("experience") ||
+                                    txt.contains("doświadczenia") ||
+                                    txt.contains("drużynowego")
+                                ) {
+                                    xpRect = box
                                 }
-                            } else {
-                                run = 0
+
+                                if (
+                                    (
+                                            txt.contains("gold") &&
+                                                    !txt.contains("kingdom")
+                                            ) ||
+                                    (
+                                            (
+                                                    txt.contains("ouro") ||
+                                                            txt.contains("0uro")
+                                                    ) &&
+                                                    !txt.contains("reino")
+                                            ) ||
+                                    (
+                                            (
+                                                    txt.contains("zlota") ||
+                                                            txt.contains("złota") ||
+                                                            txt.contains("złtota")
+                                                    ) &&
+                                                    !txt.contains("królestwa")
+                                            )
+                                ) {
+                                    goldRectFirstPass = box
+                                }
                             }
                         }
-                    }
 
-                    Log.d("GOLD_ICON_SCAN", "Scan result: bestX=$bestX run=$bestRun (Search window: Right=$searchRight)")
-                    TrackerLogger.write(
-                        "GOLD_ICON_SCAN",
-                        "Scan result: bestX=$bestX run=$bestRun (Search window: Right=$searchRight)"
+                        var adjustedLeft = 0
+
+                        // Fallback baseline text pointer if pixel scan misses completely
+                        val baseTextLeft =
+                            when {
+                                goldRectFirstPass != null ->
+                                    goldRectFirstPass!!.left
+
+                                xpRect != null ->
+                                    xpRect!!.left
+
+                                else ->
+                                    0
+                            }
+
+                        // If Gold row is identified,
+                        // find its yellow icon batch
+                        if (goldRectFirstPass != null) {
+
+                            val w =
+                                croppedBitmap!!.width
+
+                            val h =
+                                croppedBitmap!!.height
+
+                            val pixels =
+                                IntArray(w * h)
+
+                            croppedBitmap!!.getPixels(
+                                pixels,
+                                0,
+                                w,
+                                0,
+                                0,
+                                w,
+                                h
+                            )
+
+                            val searchLeft = 0
+
+                            val searchRight =
+                                max(
+                                    1,
+                                    goldRectFirstPass!!.left - 5
+                                )
+
+                            val centerY =
+                                goldRectFirstPass!!.centerY()
+
+                            val searchTop =
+                                max(
+                                    0,
+                                    centerY - 30
+                                )
+
+                            val searchBottom =
+                                min(
+                                    h,
+                                    centerY + 30
+                                )
+
+                            var bestX = -1
+                            var bestRun = 0
+
+                            for (x in searchLeft until searchRight) {
+
+                                var run = 0
+
+                                for (y in searchTop until searchBottom) {
+
+                                    val c =
+                                        pixels[y * w + x]
+
+                                    val r =
+                                        (c shr 16) and 255
+
+                                    val g =
+                                        (c shr 8) and 255
+
+                                    val b =
+                                        c and 255
+
+                                    // Looking for the vibrant yellow
+                                    // color profile of the gold coin/pouch icon
+                                    val isYellow =
+                                        r >= 160 &&
+                                                g >= 140 &&
+                                                b <= 90 &&
+                                                (r - b) >= 70
+
+                                    if (isYellow) {
+
+                                        run++
+
+                                        if (run > bestRun) {
+
+                                            bestRun = run
+                                            bestX = x
+                                        }
+
+                                    } else {
+
+                                        run = 0
+                                    }
+                                }
+                            }
+
+                            Log.d(
+                                "GOLD_ICON_SCAN",
+                                "Scan result: bestX=$bestX run=$bestRun " +
+                                        "(Search window: Right=$searchRight)"
+                            )
+
+                            TrackerLogger.write(
+                                "GOLD_ICON_SCAN",
+                                "Scan result: bestX=$bestX run=$bestRun " +
+                                        "(Search window: Right=$searchRight)"
+                            )
+
+                            if (
+                                bestRun >= 2 &&
+                                bestX != -1
+                            ) {
+
+                                // Found yellow icon:
+                                // step right past its center point
+                                adjustedLeft =
+                                    bestX + 10
+
+                            } else {
+
+                                // Fallback using text boundary directly
+                                if (baseTextLeft > 0) {
+
+                                    adjustedLeft =
+                                        baseTextLeft + 10
+
+                                } else {
+
+                                    adjustedLeft =
+                                        max(
+                                            0,
+                                            detectLeftEdge(
+                                                croppedBitmap!!
+                                            ) - 100
+                                        )
+                                }
+                            }
+
+                        } else if (xpRect != null) {
+
+                            // Fallback to text position if Gold
+                            // row wasn't caught in first pass
+                            adjustedLeft =
+                                xpRect!!.left + 10
+
+                        } else {
+
+                            adjustedLeft =
+                                max(
+                                    0,
+                                    detectLeftEdge(
+                                        croppedBitmap!!
+                                    ) - 20
+                                )
+                        }
+
+                        // Protect safety boundary constraints
+                        adjustedLeft =
+                            adjustedLeft.coerceIn(
+                                0,
+                                croppedBitmap!!.width - 20
+                            )
+
+                        DebugOverlayData.detectedLeft =
+                            adjustedLeft
+
+                        DebugOverlayData.bitmapWidth =
+                            croppedBitmap!!.width
+
+                        finalBitmap =
+                            Bitmap.createBitmap(
+                                croppedBitmap!!,
+                                adjustedLeft,
+                                0,
+                                croppedBitmap!!.width - adjustedLeft,
+                                croppedBitmap!!.height
+                            )
+
+                        OcrDebugBuffer.detectedLeft =
+                            left + adjustedLeft
+
+                        OcrDebugBuffer.detectedY =
+                            if (xpRect != null)
+                                top + xpRect!!.centerY()
+                            else
+                                -1
+
+                        OcrDebugBuffer.finalCrop =
+                            Rect(
+                                left + adjustedLeft,
+                                top,
+                                right,
+                                bottom
+                            )
+
+                        OcrDebugBuffer.bookmarkRect = null
+
+                        // SECOND OCR PASS - REAL TRACKING
+
+                        val scaling =
+                            if (
+                                SettingsStore.getHighQualityOcr(this)
+                            ) {
+                                1
+                            } else {
+                                2
+                            }
+
+                        scaledBitmap =
+                            Bitmap.createScaledBitmap(
+                                finalBitmap!!,
+                                finalBitmap!!.width / scaling,
+                                finalBitmap!!.height / scaling,
+                                false
+                            )
+
+                        val inputImage =
+                            InputImage.fromBitmap(
+                                scaledBitmap!!,
+                                0
+                            )
+
+                        recognizer.process(inputImage)
+
+                            .addOnSuccessListener { visionText ->
+
+                                try {
+
+                                    Log.d(
+                                        "OCR_BITMAP",
+                                        "Full: ${fullBitmap!!.width}x${fullBitmap!!.height}"
+                                    )
+
+                                    TrackerLogger.write(
+                                        "OCR_BITMAP",
+                                        "Full=${fullBitmap!!.width}x${fullBitmap!!.height} " +
+                                                "Crop=L=$left T=$top W=$width H=$height " +
+                                                "Final=${scaledBitmap!!.width}x${scaledBitmap!!.height}"
+                                    )
+
+                                    Log.d(
+                                        "OCR_BITMAP",
+                                        "Crop: L=$left T=$top W=$width H=$height"
+                                    )
+
+                                    TrackerLogger.write(
+                                        "OCR_BITMAP",
+                                        "Crop: L=$left T=$top W=$width H=$height"
+                                    )
+
+                                    Log.d(
+                                        "OCR_BITMAP",
+                                        "Final OCR bitmap: " +
+                                                "${scaledBitmap!!.width}x${scaledBitmap!!.height}"
+                                    )
+
+                                    TrackerLogger.write(
+                                        "OCR_BITMAP",
+                                        "Final OCR bitmap: " +
+                                                "${scaledBitmap!!.width}x${scaledBitmap!!.height}"
+                                    )
+
+                                    if (DebugController.enabled) {
+
+                                        OcrDebugBuffer.lastText =
+                                            visionText.text
+                                    }
+
+                                    Log.d(
+                                        "OCR_RAW",
+                                        "================ OCR FRAME ================"
+                                    )
+
+                                    TrackerLogger.write(
+                                        "OCR_RAW",
+                                        "================ OCR FRAME ================"
+                                    )
+
+                                    Log.d(
+                                        "OCR_RAW",
+                                        visionText.text
+                                    )
+
+                                    TrackerLogger.write(
+                                        "OCR_RAW",
+                                        visionText.text
+                                    )
+
+                                    OcrDebugBuffer.xpLeft = -1
+                                    OcrDebugBuffer.xpTop = -1
+                                    OcrDebugBuffer.ornsLeft = -1
+                                    OcrDebugBuffer.ornsTop = -1
+                                    OcrDebugBuffer.goldLeft = -1
+                                    OcrDebugBuffer.goldTop = -1
+
+                                    for (block in visionText.textBlocks) {
+
+                                        for (line in block.lines) {
+
+                                            // Clean up character
+                                            // misidentifications
+                                            val txt =
+                                                line.text
+                                                    .lowercase()
+                                                    .replace(
+                                                        "0rns",
+                                                        "orns"
+                                                    )
+                                                    .replace(
+                                                        "0rn5",
+                                                        "orns"
+                                                    )
+                                                    .replace(
+                                                        "orn5",
+                                                        "orns"
+                                                    )
+                                                    .replace(
+                                                        "0uro",
+                                                        "ouro"
+                                                    )
+
+                                            val box =
+                                                line.boundingBox
+                                                    ?: continue
+
+                                            val screenRect =
+                                                Rect(
+                                                    left +
+                                                            adjustedLeft +
+                                                            box.left *
+                                                            scaling,
+
+                                                    top +
+                                                            box.top *
+                                                            scaling,
+
+                                                    left +
+                                                            adjustedLeft +
+                                                            box.right *
+                                                            scaling,
+
+                                                    top +
+                                                            box.bottom *
+                                                            scaling
+                                                )
+
+                                            when {
+
+                                                txt.contains("xp") ||
+                                                        txt.contains("experience") ||
+                                                        txt.contains("doświadczenia") ||
+                                                        txt.contains("drużynowego") -> {
+
+                                                    OcrDebugBuffer.xpLeft =
+                                                        screenRect.left
+
+                                                    OcrDebugBuffer.xpTop =
+                                                        screenRect.top
+                                                }
+
+                                                txt.contains("orns") ||
+                                                        txt.contains("orn") ||
+                                                        txt.contains("ornów") -> {
+
+                                                    OcrDebugBuffer.ornsLeft =
+                                                        screenRect.left
+
+                                                    OcrDebugBuffer.ornsTop =
+                                                        screenRect.top
+                                                }
+
+                                                txt.contains("gold") ||
+                                                        txt.contains("ouro") ||
+                                                        txt.contains("złota") -> {
+
+                                                    OcrDebugBuffer.goldLeft =
+                                                        screenRect.left
+
+                                                    OcrDebugBuffer.goldTop =
+                                                        screenRect.top
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    val text =
+                                        visionText.text.lowercase()
+
+                                    // Debug OCR bounding boxes
+                                    OcrDebugBuffer.xpRect = null
+                                    OcrDebugBuffer.ornsRect = null
+                                    OcrDebugBuffer.goldRect = null
+
+                                    for (block in visionText.textBlocks) {
+
+                                        for (line in block.lines) {
+
+                                            val txt =
+                                                line.text
+                                                    .lowercase()
+                                                    .replace(
+                                                        "0rns",
+                                                        "orns"
+                                                    )
+                                                    .replace(
+                                                        "0rn5",
+                                                        "orns"
+                                                    )
+                                                    .replace(
+                                                        "orn5",
+                                                        "orns"
+                                                    )
+                                                    .replace(
+                                                        "0uro",
+                                                        "ouro"
+                                                    )
+
+                                            val box =
+                                                line.boundingBox
+                                                    ?: continue
+
+                                            val screenRect =
+                                                Rect(
+                                                    left +
+                                                            adjustedLeft +
+                                                            box.left *
+                                                            scaling,
+
+                                                    top +
+                                                            box.top *
+                                                            scaling,
+
+                                                    left +
+                                                            adjustedLeft +
+                                                            box.right *
+                                                            scaling,
+
+                                                    top +
+                                                            box.bottom *
+                                                            scaling
+                                                )
+
+                                            if (
+                                                txt.contains("xp") ||
+                                                txt.contains("party xp") ||
+                                                txt.contains("doświadczenia") ||
+                                                txt.contains("drużynowego")
+                                            ) {
+
+                                                OcrDebugBuffer.xpRect =
+                                                    screenRect
+                                            }
+
+                                            if (
+                                                txt.contains("orns") ||
+                                                txt.contains("orn") ||
+                                                txt.contains("ornów")
+                                            ) {
+
+                                                OcrDebugBuffer.ornsRect =
+                                                    screenRect
+                                            }
+
+                                            if (
+                                                (
+                                                        txt.contains("gold") &&
+                                                                !txt.contains("kingdom")
+                                                        ) ||
+                                                (
+                                                        txt.contains("ouro") &&
+                                                                !txt.contains("reino")
+                                                        ) ||
+                                                (
+                                                        (
+                                                                txt.contains("zlota") ||
+                                                                        txt.contains("złota") ||
+                                                                        txt.contains("złtota")
+                                                                ) &&
+                                                                !txt.contains("królestwa")
+                                                        )
+                                            ) {
+
+                                                OcrDebugBuffer.goldRect =
+                                                    screenRect
+                                            }
+                                        }
+                                    }
+
+                                    val isRewardScreen =
+                                        text.contains("victory") ||
+                                                text.contains("experience") ||
+                                                text.contains("party") ||
+                                                text.contains("orns") ||
+                                                text.contains("gold") ||
+                                                text.contains("here's what you found") ||
+                                                text.contains("heres what you found") ||
+                                                text.contains("defeated") ||
+                                                text.contains("dungeon complete") ||
+                                                text.contains("boss defeated") ||
+                                                text.contains("complete") ||
+                                                text.contains("zwcięstwo") ||
+                                                text.contains("otrzymano")
+
+                                    if (isRewardScreen) {
+
+                                        if (!rewardScreenSeen) {
+
+                                            rewardScreenSeen = true
+
+                                            parseRewards(text)
+                                        }
+
+                                    } else {
+
+                                        rewardScreenSeen = false
+                                    }
+
+                                } finally {
+
+                                    // second OCR finished.
+                                    // recycle all Bitmaps.
+                                    recycleBitmapSafe(scaledBitmap)
+                                    recycleBitmapSafe(finalBitmap)
+                                    recycleBitmapSafe(croppedBitmap)
+                                    recycleBitmapSafe(fullBitmap)
+
+                                    scaledBitmap = null
+                                    finalBitmap = null
+                                    croppedBitmap = null
+                                    fullBitmap = null
+
+                                    ocrBusy = false
+                                }
+                            }
+
+                            .addOnFailureListener { e ->
+
+                                Log.e(
+                                    "OCR_RAW",
+                                    "OCR FAILED - SECOND PASS",
+                                    e
+                                )
+
+                                recycleBitmapSafe(scaledBitmap)
+                                recycleBitmapSafe(finalBitmap)
+                                recycleBitmapSafe(croppedBitmap)
+                                recycleBitmapSafe(fullBitmap)
+
+                                scaledBitmap = null
+                                finalBitmap = null
+                                croppedBitmap = null
+                                fullBitmap = null
+
+                                ocrBusy = false
+                            }
+
+                    } catch (e: Exception) {
+
+                        Log.e(
+                            "OCR_RAW",
+                            "Error during modern OCR first pass callback",
+                            e
+                        )
+
+                        recycleBitmapSafe(scaledBitmap)
+                        recycleBitmapSafe(finalBitmap)
+                        recycleBitmapSafe(croppedBitmap)
+                        recycleBitmapSafe(fullBitmap)
+
+                        scaledBitmap = null
+                        finalBitmap = null
+                        croppedBitmap = null
+                        fullBitmap = null
+
+                        ocrBusy = false
+                    }
+                }
+
+                .addOnFailureListener { e ->
+
+                    Log.e(
+                        "OCR_RAW",
+                        "OCR FAILED - FIRST PASS",
+                        e
                     )
 
-                    if (bestRun >= 2 && bestX != -1) {
-                        // Found yellow icon: step right past its center point
-                        adjustedLeft = bestX + 10
-                    } else {
-                        // Fallback using text boundary directly if no yellow found
-                        adjustedLeft = if (baseTextLeft > 0) baseTextLeft + 10 else max(0, detectLeftEdge(croppedBitmap) - 100)
-                    }
-                } else if (xpRect != null) {
-                    // Fallback to text position if Gold row wasn't caught in first pass
-                    adjustedLeft = xpRect!!.left + 10
-                } else {
-                    adjustedLeft = max(0, detectLeftEdge(croppedBitmap) - 20)
+                    recycleBitmapSafe(croppedBitmap)
+                    recycleBitmapSafe(fullBitmap)
+
+                    croppedBitmap = null
+                    fullBitmap = null
+
+                    ocrBusy = false
                 }
 
-                // Protect safety boundary constraints
-                adjustedLeft = adjustedLeft.coerceIn(0, croppedBitmap.width - 20)
+        } catch (e: Exception) {
 
-                DebugOverlayData.detectedLeft = adjustedLeft
-                DebugOverlayData.bitmapWidth = croppedBitmap.width
+            Log.e(
+                "OCR_RAW",
+                "Error starting modern OCR",
+                e
+            )
 
-                val finalBitmap = Bitmap.createBitmap(
-                    croppedBitmap,
-                    adjustedLeft,
-                    0,
-                    croppedBitmap.width - adjustedLeft,
-                    croppedBitmap.height
-                )
+            recycleBitmapSafe(croppedBitmap)
+            recycleBitmapSafe(fullBitmap)
 
-                OcrDebugBuffer.detectedLeft = left + adjustedLeft
-                OcrDebugBuffer.detectedY = if (xpRect != null) top + xpRect!!.centerY() else -1
-                OcrDebugBuffer.finalCrop = Rect(left + adjustedLeft, top, right, bottom)
-                OcrDebugBuffer.bookmarkRect = null
+            croppedBitmap = null
+            fullBitmap = null
 
-
-                // SECOND OCR PASS - REAL TRACKING
-
-
-                val scaling = if (SettingsStore.getHighQualityOcr(this)) 1 else 2
-
-                val scaledBitmap = Bitmap.createScaledBitmap(
-                    finalBitmap,
-                    finalBitmap.width / scaling,
-                    finalBitmap.height / scaling,
-                    false
-                )
-
-                val inputImage = InputImage.fromBitmap(scaledBitmap, 0)
-
-                recognizer.process(inputImage)
-                    .addOnSuccessListener { visionText ->
-                        Log.d("OCR_BITMAP", "Full: ${fullBitmap.width}x${fullBitmap.height}")
-                        TrackerLogger.write(
-                            "OCR_BITMAP",
-                            "Full=${fullBitmap.width}x${fullBitmap.height} Crop=L=$left T=$top W=$width H=$height Final=${scaledBitmap.width}x${scaledBitmap.height}"
-                        )
-                        Log.d("OCR_BITMAP", "Crop: L=$left T=$top W=$width H=$height")
-                        TrackerLogger.write(
-                            "OCR_BITMAP",
-                            "Crop: L=$left T=$top W=$width H=$height"
-                        )
-                        Log.d("OCR_BITMAP", "Final OCR bitmap: ${scaledBitmap.width}x${scaledBitmap.height}")
-                        TrackerLogger.write(
-                            "OCR_BITMAP",
-                            "Final OCR bitmap: ${scaledBitmap.width}x${scaledBitmap.height}"
-                        )
-
-                        if (DebugController.enabled) {
-                            OcrDebugBuffer.lastText = visionText.text
-                        }
-
-                        Log.d("OCR_RAW", "================ OCR FRAME ================")
-                        TrackerLogger.write(
-                            "OCR_RAW",
-                            "================ OCR FRAME ================"
-                        )
-                        Log.d("OCR_RAW", visionText.text)
-                        TrackerLogger.write(
-                            "OCR_RAW",
-                            visionText.text
-                        )
-
-                        OcrDebugBuffer.xpLeft = -1
-                        OcrDebugBuffer.xpTop = -1
-                        OcrDebugBuffer.ornsLeft = -1
-                        OcrDebugBuffer.ornsTop = -1
-                        OcrDebugBuffer.goldLeft = -1
-                        OcrDebugBuffer.goldTop = -1
-
-                        for (block in visionText.textBlocks) {
-                            for (line in block.lines) {
-                                // Clean up character misidentifications (like 0 instead of o, 5 instead of s)
-                                val txt = line.text.lowercase()
-                                    .replace("0rns", "orns")
-                                    .replace("0rn5", "orns")
-                                    .replace("orn5", "orns")
-                                    .replace("0uro", "ouro")
-
-                                val box = line.boundingBox ?: continue
-
-                                val screenRect = Rect(
-                                    left + adjustedLeft + box.left * scaling,
-                                    top + box.top * scaling,
-                                    left + adjustedLeft + box.right * scaling,
-                                    top + box.bottom * scaling
-                                )
-
-                                when {
-                                    txt.contains("xp") ||
-                                            txt.contains("experience") ||
-                                            txt.contains("doświadczenia") ||
-                                            txt.contains("drużynowego") -> {
-                                        OcrDebugBuffer.xpLeft = screenRect.left
-                                        OcrDebugBuffer.xpTop = screenRect.top
-                                    }
-
-                                    txt.contains("orns") ||
-                                            txt.contains("orn") ||
-                                            txt.contains("ornów") -> {
-                                        OcrDebugBuffer.ornsLeft = screenRect.left
-                                        OcrDebugBuffer.ornsTop = screenRect.top
-                                    }
-
-                                    txt.contains("gold") ||
-                                            txt.contains("ouro") ||
-                                            txt.contains("złota") -> {
-                                        OcrDebugBuffer.goldLeft = screenRect.left
-                                        OcrDebugBuffer.goldTop = screenRect.top
-                                    }
-                                }
-                            }
-                        }
-
-                        val text = visionText.text.lowercase()
-
-                        // Debug OCR bounding boxes
-                        OcrDebugBuffer.xpRect = null
-                        OcrDebugBuffer.ornsRect = null
-                        OcrDebugBuffer.goldRect = null
-
-                        for (block in visionText.textBlocks) {
-                            for (line in block.lines) {
-                                val txt = line.text.lowercase()
-                                    .replace("0rns", "orns")
-                                    .replace("0rn5", "orns")
-                                    .replace("orn5", "orns")
-                                    .replace("0uro", "ouro")
-
-                                val box = line.boundingBox ?: continue
-
-                                val screenRect = Rect(
-                                    left + adjustedLeft + box.left * scaling,
-                                    top + box.top * scaling,
-                                    left + adjustedLeft + box.right * scaling,
-                                    top + box.bottom * scaling
-                                )
-
-                                if (txt.contains("xp") || txt.contains("party xp") ||
-                                    txt.contains("doświadczenia") || txt.contains("drużynowego")) {
-                                    OcrDebugBuffer.xpRect = screenRect
-                                }
-
-                                if (txt.contains("orns") || txt.contains("orn") || txt.contains("ornów")) {
-                                    OcrDebugBuffer.ornsRect = screenRect
-                                }
-
-                                if ((txt.contains("gold") && !txt.contains("kingdom")) ||
-                                    (txt.contains("ouro") && !txt.contains("reino")) ||
-                                    ((txt.contains("zlota") || txt.contains("złota") || txt.contains("złtota")) && !txt.contains("królestwa"))) {
-                                    OcrDebugBuffer.goldRect = screenRect
-                                }
-                            }
-                        }
-
-                        val isRewardScreen =
-                            text.contains("victory") ||
-                                    text.contains("experience") ||
-                                    text.contains("party") ||
-                                    text.contains("orns") ||
-                                    text.contains("gold") ||
-                                    text.contains("here's what you found") ||
-                                    text.contains("heres what you found") ||
-                                    text.contains("defeated") ||
-                                    text.contains("dungeon complete") ||
-                                    text.contains("boss defeated") ||
-                                    text.contains("complete") ||
-                                    text.contains("zwcięstwo") ||
-                                    text.contains("otrzymano")
-
-                        if (isRewardScreen) {
-                            if (!rewardScreenSeen) {
-                                rewardScreenSeen = true
-                                parseRewards(text)
-                            }
-                        } else {
-                            rewardScreenSeen = false
-                        }
-
-                        fullBitmap.recycle()
-                        croppedBitmap.recycle()
-                        finalBitmap.recycle()
-                        scaledBitmap.recycle()
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e("OCR_RAW", "OCR FAILED", e)
-                    }
-                //ocrBusy = false
-            }
+            ocrBusy = false
+        }
     }
 
     private fun extractBefore(text: String, keyword: String): Long {

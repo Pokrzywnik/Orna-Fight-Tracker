@@ -235,7 +235,9 @@ class ItemCaptureService : Service() {
                         0,
                         screenWidth,
                         screenHeight
-                    )
+                    ).also {
+                        bitmap.recycle()
+                    }
 
                 } else {
                     bitmap

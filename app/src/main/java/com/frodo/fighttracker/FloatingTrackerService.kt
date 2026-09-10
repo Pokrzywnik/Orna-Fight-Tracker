@@ -13,6 +13,7 @@ import android.view.WindowManager
 import android.widget.ImageView
 import android.util.Log
 import java.util.concurrent.Executors
+import android.provider.Settings
 
 class FloatingTrackerService : Service() {
 
@@ -86,10 +87,65 @@ class FloatingTrackerService : Service() {
         params.x = 100
         params.y = 300
 
-        windowManager.addView(
-            floatingView,
-            params
-        )
+        /*
+         * SYSTEM_ALERT_WINDOW is required for
+         * TYPE_APPLICATION_OVERLAY.
+         *
+         * The permission can be revoked by the user at any time,
+         * so never assume that it is still available.
+         */
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+            !Settings.canDrawOverlays(this)
+        ) {
+
+            Log.w(
+                "FloatingTracker",
+                "SYSTEM_ALERT_WINDOW permission is not granted - stopping service"
+            )
+
+            isRunning = false
+            instance = null
+            stopSelf()
+
+            return
+        }
+
+        try {
+
+            windowManager.addView(
+                floatingView,
+                params
+            )
+
+        } catch (e: WindowManager.BadTokenException) {
+
+            Log.e(
+                "FloatingTracker",
+                "Could not add floating overlay - overlay permission denied",
+                e
+            )
+
+            isRunning = false
+            instance = null
+            stopSelf()
+
+            return
+
+        } catch (e: SecurityException) {
+
+            Log.e(
+                "FloatingTracker",
+                "Could not add floating overlay - security permission denied",
+                e
+            )
+
+            isRunning = false
+            instance = null
+            stopSelf()
+
+            return
+        }
 
         setupButton(button)
         updateScanIcon()

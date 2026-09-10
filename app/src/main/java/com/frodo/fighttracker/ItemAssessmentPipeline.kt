@@ -991,6 +991,41 @@ class ItemAssessmentPipeline(
         PaddleOcrRecognizer.RecognitionResult
     )
 
+    fun cancelCurrentInference() {
+
+        Log.d(
+            TAG,
+            "========================================"
+        )
+
+        Log.d(
+            TAG,
+            "CANCELLING CURRENT ITEM ASSESSMENT INFERENCE"
+        )
+
+        /*
+         * Terminate any native ONNX inference currently
+         * running inside the detector.
+         */
+        detector.cancelCurrentRun()
+
+        /*
+         * Terminate any native ONNX inference currently
+         * running inside the recognizer.
+         */
+        recognizer.cancelCurrentRuns()
+
+        Log.d(
+            TAG,
+            "ONNX inference termination requested"
+        )
+
+        Log.d(
+            TAG,
+            "========================================"
+        )
+    }
+
     fun processBitmap(
         bitmap: Bitmap
     ): PipelineResult {

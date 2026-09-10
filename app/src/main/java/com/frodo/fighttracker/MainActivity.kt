@@ -493,15 +493,31 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.fabFloatingToggle.setOnClickListener {
-            checkOverlayPermission()
 
             if (!isFloatingEnabled) {
+
+                if (!Settings.canDrawOverlays(this)) {
+
+                    checkOverlayPermission()
+                    return@setOnClickListener
+                }
+
                 startFloatingService()
-                binding.fabFloatingToggle.setImageResource(android.R.drawable.ic_media_pause)
+
+                binding.fabFloatingToggle.setImageResource(
+                    android.R.drawable.ic_media_pause
+                )
+
                 isFloatingEnabled = true
+
             } else {
+
                 stopFloatingService()
-                binding.fabFloatingToggle.setImageResource(android.R.drawable.ic_media_play)
+
+                binding.fabFloatingToggle.setImageResource(
+                    android.R.drawable.ic_media_play
+                )
+
                 isFloatingEnabled = false
             }
         }
