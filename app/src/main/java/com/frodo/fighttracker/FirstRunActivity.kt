@@ -11,7 +11,7 @@ class FirstRunActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        title = "UPDATE 2.8 \uD83D\uDD25"
+        title = "UPDATE 2.9 \uD83D\uDD25"
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(20, 40, 20, 40)
@@ -21,14 +21,16 @@ class FirstRunActivity : Activity() {
 
             setText(
                 """
-                • HotFix Boss Scaling in Item Assess 
-                • Fixed bug displaying 0-0% range when unknown
-                • Fixed few crashes on samsung and pixel devices
-                • Fixed memory leaks
+                • Added Proof Tracking 👀 (report bugs if found any)
+                • Disabled few checks because of new currency-on-top
+                 This might lead to inaccurate orn readings again...
+                • Added start/stop button to overlay
+                • Added undo last reward button
+                • Added proofs/currencies selection for overlay customization
+                • Updated items database
                 
                 Click play button on bottom right to hide/show floating controller.
-                Use it to start/stop live Assess.
-                Go to item and you will see item qualities
+                Use it to start/stop live item Assess.
                 Click on overlay to copy Name+ X% to clipboard for renaming
                 
                 If you encounter any bugs - feel free to hit me up on discord - Frodo9382

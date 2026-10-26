@@ -37,6 +37,16 @@ object RunStorage {
         obj.put("exp", run.exp)
         obj.put("shards", run.shards)
 
+        val proofsObj = JSONObject()
+
+        for ((id, count) in run.proofs) {
+            if (count > 0) {
+                proofsObj.put(id, count)
+            }
+        }
+
+        obj.put("proofs", proofsObj)
+
         android.util.Log.d(
             "RUN_HISTORY",
             "ADDING RUN -> ${obj}"
@@ -72,6 +82,22 @@ object RunStorage {
 
             val obj = array.getJSONObject(i)
 
+            val proofs = mutableMapOf<String, Long>()
+
+            val proofsObj = obj.optJSONObject("proofs")
+
+            if (proofsObj != null) {
+
+                val keys = proofsObj.keys()
+
+                while (keys.hasNext()) {
+
+                    val id = keys.next()
+
+                    proofs[id] = proofsObj.optLong(id, 0L)
+                }
+            }
+
             list.add(
                 RunRecord(
                     obj.getString("runid"),
@@ -81,7 +107,8 @@ object RunStorage {
                     obj.getLong("orns"),
                     obj.getLong("exp"),
                     obj.optLong("shards", 0L),
-                    obj.optString("name", "")
+                    obj.optString("name", ""),
+                    proofs
                 )
             )
         }

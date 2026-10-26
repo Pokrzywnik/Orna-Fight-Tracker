@@ -1,90 +1,162 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
+    android:background="@drawable/overlay_background">
 
-    android:background="@drawable/overlay_background"
-
-    android:orientation="vertical"
-
-    android:padding="12dp">
-
-<TextView
-    		android:id="@+id/headerText"
-    		android:layout_width="match_parent"
-   		android:layout_height="wrap_content"
- 		android:gravity="center"
- 		android:text="Total"
- 		android:textStyle="bold"
- 		android:textSize="14sp"
-    		android:textColor="#FFFFFF"
-    		android:paddingBottom="4dp"/>
-
+    <!-- minWidth is on the content itself, so the overlay never shrinks below it -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <ImageView
-            android:layout_width="22dp"
-            android:layout_height="22dp"
-            android:src="@drawable/orns" />
+        android:minWidth="200dp"
+        android:orientation="vertical"
+        android:padding="12dp">
 
         <TextView
-            android:id="@+id/ornsText"
+            android:id="@+id/headerText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:maxLines="1"
+            android:paddingStart="22dp"
+            android:paddingEnd="22dp"
+            android:paddingBottom="4dp"
+            android:text="Total"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/ornsRow"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="0 /min"
-            android:textSize="16sp" 
-			android:textColor="#FFFFFFFF"
-			android:alpha="1.0"/>
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/orns" />
+
+            <TextView
+                android:id="@+id/ornsText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="0 /min"
+                android:textColor="#FFFFFFFF"
+                android:textSize="16sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/xpRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/exp_potion" />
+
+            <TextView
+                android:id="@+id/xpText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="0 /min"
+                android:textColor="#FFFFFFFF"
+                android:textSize="16sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/goldRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/gold" />
+
+            <TextView
+                android:id="@+id/goldText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="0 /min"
+                android:textColor="#FFFFFFFF"
+                android:textSize="16sp" />
+        </LinearLayout>
+
+        <!-- proofs / keys (filled from code) -->
+        <LinearLayout
+            android:id="@+id/proofsContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone" />
+
+        <!-- Start/Stop and Undo: 50% / 50% -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:baselineAligned="false"
+            android:orientation="horizontal"
+            android:weightSum="2">
+
+            <TextView
+                android:id="@+id/toggleButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="false"
+                android:gravity="center"
+                android:maxLines="1"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:text="■ Stop"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/undoButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="false"
+                android:gravity="center"
+                android:maxLines="1"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:text="↶"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+        </LinearLayout>
     </LinearLayout>
 
-    <LinearLayout
+    <!-- close: always visible, top-left -->
+    <TextView
+        android:id="@+id/closeButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal">
+        android:layout_gravity="top|start"
+        android:clickable="true"
+        android:focusable="false"
+        android:padding="8dp"
+        android:text="✕"
+        android:textColor="#CCCCCC"
+        android:textSize="14sp"
+        android:textStyle="bold" />
 
-        <ImageView
-            android:layout_width="22dp"
-            android:layout_height="22dp"
-            android:src="@drawable/exp_potion" />
-
-        <TextView
-            android:id="@+id/xpText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="0 /min"
-            android:textSize="16sp" 
-			android:textColor="#FFFFFFFF"
-			android:alpha="1.0"/>
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal">
-
-        <ImageView
-            android:layout_width="22dp"
-            android:layout_height="22dp"
-            android:src="@drawable/gold" />
-
-        <TextView
-            android:id="@+id/goldText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="0 /min"
-            android:textSize="16sp" 
-			android:textColor="#FFFFFFFF"
-			android:alpha="1.0"/>
-    </LinearLayout>
-
-</LinearLayout>
+</FrameLayout>

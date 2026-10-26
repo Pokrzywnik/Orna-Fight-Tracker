@@ -12,10 +12,12 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import android.view.Gravity
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.view.MotionEvent
 import android.widget.Toast
+import coil.load
 
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -30,8 +32,21 @@ class TrackerFragment : Fragment() {
     private var stopHoldRunnable: Runnable? = null
     private var isHolding = false
 
+    /** proof id -> counter TextView currently shown under the stats */
+    private val proofCountViews = mutableMapOf<String, TextView>()
+
+    private fun fmt(value: Long): String {
+        return value.toString()
+            .reversed()
+            .chunked(3)
+            .joinToString(" ")
+            .reversed()
+    }
+
     override fun onResume() {
         super.onResume()
+        // Anguish version could have been changed in settings
+        refreshProofViews()
         renderHistory()
     }
 
@@ -47,47 +62,33 @@ class TrackerFragment : Fragment() {
 
         handler.post(object : Runnable {
             override fun run() {
-                binding.goldText.text =
-                    "gold: ${
-                        FightState.gold.toString()
-                            .reversed()
-                            .chunked(3)
-                            .joinToString(" ")
-                            .reversed()
-                    }"
 
-                binding.ornsText.text =
-                    "orns: ${
-                        FightState.orns.toString()
-                            .reversed()
-                            .chunked(3)
-                            .joinToString(" ")
-                            .reversed()
-                    }"
+                // view destroyed -> stop this loop
+                val b = _binding ?: return
 
-                binding.expText.text =
-                    "exp: ${
-                        FightState.exp.toString()
-                            .reversed()
-                            .chunked(3)
-                            .joinToString(" ")
-                            .reversed()
-                    }"
+                b.goldText.text = "gold: ${fmt(FightState.gold)}"
 
-                binding.shardsText.text =
-                    "tower shards: ${
-                        FightState.shards.toString()
-                            .reversed()
-                            .chunked(3)
-                            .joinToString(" ")
-                            .reversed()
-                    }"
+                b.ornsText.text = "orns: ${fmt(FightState.orns)}"
+
+                b.expText.text = "exp: ${fmt(FightState.exp)}"
+
+                b.shardsText.text = "tower shards: ${fmt(FightState.shards)}"
+
+                for ((id, view) in proofCountViews) {
+                    view.text = fmt(FightState.proofs[id] ?: 0L)
+                }
 
                 handler.postDelayed(this, 500)
 
             }
 
         })
+
+        binding.proofModeButton.setOnClickListener {
+            showProofModeDialog()
+        }
+
+        refreshProofViews()
 
         binding.startButton.setOnClickListener {
             FightState.startTime = System.currentTimeMillis()
@@ -178,13 +179,240 @@ class TrackerFragment : Fragment() {
 
         return binding.root
     }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        proofCountViews.clear()
+        _binding = null
+    }
+
+    /**
+     * Dialog: what is tracked (shown in this tab) and what is
+     * shown in the floating overlay.
+     *
+     * Section 1: Orns / EXP / Gold
+     * Section 2: Proofs / King's guard / Skeleton key
+     *
+     * Each row: checkbox (track) + switch (show in overlay).
+     */
+    private fun showProofModeDialog() {
+
+        val ctx = requireContext()
+
+        val modes = ProofTracking.Mode.values()
+        val currencies = CurrencyTracking.Currency.values()
+
+        val tracked = ProofTracking.getModes(ctx).toMutableSet()
+        val overlay = ProofTracking.getOverlayModes(ctx).toMutableSet()
+
+        val curTracked = CurrencyTracking.getTracked(ctx).toMutableSet()
+        val curOverlay = CurrencyTracking.getOverlay(ctx).toMutableSet()
+
+        val density = resources.displayMetrics.density
+        val pad = (16 * density).toInt()
+
+        val root = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad, pad / 2, pad, 0)
+        }
+
+        fun addHeader(title: String) {
+            root.addView(LinearLayout(ctx).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, (8 * density).toInt(), 0, 0)
+                addView(TextView(ctx).apply {
+                    text = title
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    layoutParams = LinearLayout.LayoutParams(
+                        0,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        1f
+                    )
+                })
+                addView(TextView(ctx).apply {
+                    text = "Overlay"
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                })
+            })
+        }
+
+        fun addRow(
+            label: String,
+            isTracked: Boolean,
+            isOverlay: Boolean,
+            onTracked: (Boolean) -> Unit,
+            onOverlay: (Boolean) -> Unit
+        ) {
+
+            val row = LinearLayout(ctx).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+
+            val check = android.widget.CheckBox(ctx).apply {
+                text = label
+                isChecked = isTracked
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f
+                )
+            }
+
+            val sw = androidx.appcompat.widget.SwitchCompat(ctx).apply {
+                isChecked = isOverlay
+                isEnabled = isTracked
+            }
+
+            check.setOnCheckedChangeListener { _, checked ->
+                onTracked(checked)
+                sw.isEnabled = checked
+            }
+
+            sw.setOnCheckedChangeListener { _, checked ->
+                onOverlay(checked)
+            }
+
+            row.addView(check)
+            row.addView(sw)
+            root.addView(row)
+        }
+
+        // --- Orns / EXP / Gold ---
+        addHeader("Currencies")
+
+        for (c in currencies) {
+            addRow(
+                label = c.label,
+                isTracked = c in curTracked,
+                isOverlay = c in curOverlay,
+                onTracked = { if (it) curTracked.add(c) else curTracked.remove(c) },
+                onOverlay = { if (it) curOverlay.add(c) else curOverlay.remove(c) }
+            )
+        }
+
+        // --- Proofs / keys ---
+        addHeader("Proofs / misc")
+
+        for (mode in modes) {
+            addRow(
+                label = mode.label,
+                isTracked = mode in tracked,
+                isOverlay = mode in overlay,
+                onTracked = { if (it) tracked.add(mode) else tracked.remove(mode) },
+                onOverlay = { if (it) overlay.add(mode) else overlay.remove(mode) }
+            )
+        }
+
+        val scroll = android.widget.ScrollView(ctx).apply {
+            addView(root)
+        }
+
+        android.app.AlertDialog.Builder(ctx)
+            .setTitle("Track")
+            .setView(scroll)
+            .setPositiveButton("OK") { _, _ ->
+
+                ProofTracking.setModes(ctx, tracked)
+                ProofTracking.setOverlayModes(ctx, overlay)
+
+                CurrencyTracking.setTracked(ctx, curTracked)
+                CurrencyTracking.setOverlay(ctx, curOverlay)
+
+                refreshProofViews()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /**
+     * Rebuilds the icon + counter rows for all enabled modes
+     * and shows / hides the Orns / EXP / Gold lines.
+     * Four icons per row so everything fits on narrow screens.
+     */
+    private fun refreshProofViews() {
+
+        val b = _binding ?: return
+
+        val ctx = context ?: return
+
+        // Orns / EXP / Gold visibility
+        val shown = CurrencyTracking.getTracked(ctx)
+
+        b.goldText.visibility =
+            if (CurrencyTracking.Currency.GOLD in shown) View.VISIBLE else View.GONE
+
+        b.ornsText.visibility =
+            if (CurrencyTracking.Currency.ORNS in shown) View.VISIBLE else View.GONE
+
+        b.expText.visibility =
+            if (CurrencyTracking.Currency.EXP in shown) View.VISIBLE else View.GONE
+
+        b.proofModeButton.text =
+            "TRACKING: ${ProofTracking.modesLabel(ctx)}"
+
+        b.proofsContainer.removeAllViews()
+        proofCountViews.clear()
+
+        val density = resources.displayMetrics.density
+        val iconSize = (28 * density).toInt()
+        val gap = (10 * density).toInt()
+
+        val proofs = ProofTracking.activeProofs(ctx)
+
+        for (rowProofs in proofs.chunked(4)) {
+
+            val row = LinearLayout(ctx).apply {
+
+                orientation = LinearLayout.HORIZONTAL
+
+                gravity = Gravity.CENTER_VERTICAL
+
+                setPadding(0, (4 * density).toInt(), 0, (4 * density).toInt())
+            }
+
+            for (proof in rowProofs) {
+
+                val icon = ImageView(ctx).apply {
+
+                    layoutParams = LinearLayout.LayoutParams(iconSize, iconSize)
+
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+
+                    load(proof.iconUrl) {
+                        crossfade(false)
+                        error(android.R.drawable.ic_menu_help)
+                    }
+                }
+
+                val count = TextView(ctx).apply {
+
+                    text = fmt(FightState.proofs[proof.id] ?: 0L)
+
+                    textSize = 18f
+
+                    setPadding((4 * density).toInt(), 0, gap, 0)
+                }
+
+                row.addView(icon)
+                row.addView(count)
+
+                proofCountViews[proof.id] = count
+            }
+
+            b.proofsContainer.addView(row)
+        }
+    }
+
     private fun renderHistory() {
+
+        val b = _binding ?: return
 
         Log.d("RUN_HISTORY", "renderHistory CALLED")
 
         val runs = RunStorage.loadRuns(requireContext())
 
-        binding.historyContainer.removeAllViews()
+        b.historyContainer.removeAllViews()
 
         fun statRow(iconRes: Int, label: String, value: String): android.view.View {
 
@@ -197,6 +425,37 @@ class TrackerFragment : Fragment() {
             val icon = android.widget.ImageView(requireContext()).apply {
                 setImageResource(iconRes)
                 layoutParams = android.widget.LinearLayout.LayoutParams(48, 48)
+            }
+
+            val text = android.widget.TextView(requireContext()).apply {
+                this.text = "$label: $value"
+                textSize = 16f
+                setPadding(24, 0, 0, 0)
+            }
+
+            row.addView(icon)
+            row.addView(text)
+
+            return row
+        }
+
+        // same row, but the icon comes from a URL
+        fun statRowUrl(iconUrl: String, label: String, value: String): android.view.View {
+
+            val row = android.widget.LinearLayout(requireContext()).apply {
+                orientation = android.widget.LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(0, 12, 0, 12)
+            }
+
+            val icon = android.widget.ImageView(requireContext()).apply {
+
+                layoutParams = android.widget.LinearLayout.LayoutParams(48, 48)
+
+                load(iconUrl) {
+                    crossfade(false)
+                    error(android.R.drawable.ic_menu_help)
+                }
             }
 
             val text = android.widget.TextView(requireContext()).apply {
@@ -252,28 +511,10 @@ class TrackerFragment : Fragment() {
             }
 
             // format numbers
-            val gold = run.gold.toString()
-                .reversed()
-                .chunked(3)
-                .joinToString(" ")
-                .reversed()
-
-            val orns = run.orns.toString()
-                .reversed()
-                .chunked(3)
-                .joinToString(" ")
-                .reversed()
-
-            val exp = run.exp.toString()
-                .reversed()
-                .chunked(3)
-                .joinToString(" ")
-                .reversed()
-            val shards = run.shards.toString()
-                .reversed()
-                .chunked(3)
-                .joinToString(" ")
-                .reversed()
+            val gold = fmt(run.gold)
+            val orns = fmt(run.orns)
+            val exp = fmt(run.exp)
+            val shards = fmt(run.shards)
 
             // run header (date + duration)
             val header = LinearLayout(requireContext()).apply {
@@ -430,6 +671,24 @@ class TrackerFragment : Fragment() {
                     )
                 )
             }
+
+            // proofs / skeleton keys collected in this run
+            for (proof in ProofTracking.allProofs) {
+
+                val count = run.proofs[proof.id] ?: 0L
+
+                if (count > 0L) {
+
+                    tile.addView(
+                        statRowUrl(
+                            proof.iconUrl,
+                            proof.label,
+                            fmt(count)
+                        )
+                    )
+                }
+            }
+
             val buttonRow = android.widget.LinearLayout(requireContext()).apply {
 
                 orientation = android.widget.LinearLayout.HORIZONTAL
@@ -443,7 +702,7 @@ class TrackerFragment : Fragment() {
 
             tile.addView(buttonRow)
 
-            binding.historyContainer.addView(tile)
+            b.historyContainer.addView(tile)
         }
     }
 }

@@ -20,6 +20,13 @@
         android:layout_marginTop="10dp"
         android:text="STOP TRACKING" />
 
+    <Button
+        android:id="@+id/proofModeButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="TRACKING: Anguish proofs" />
+
     <TextView
         android:id="@+id/goldText"
         android:layout_width="wrap_content"
@@ -47,6 +54,14 @@
         android:layout_height="wrap_content"
         android:textSize="22sp"
         android:text="Tower Shards: 0"/>
+
+    <!-- rows of icons + counters of the selected proofs (filled from code) -->
+    <LinearLayout
+        android:id="@+id/proofsContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="vertical" />
 
     <ScrollView
         android:layout_width="match_parent"

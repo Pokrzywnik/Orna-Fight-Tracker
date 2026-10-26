@@ -36,17 +36,42 @@ class FightTrackerService : Service() {
     companion object {
         const val CHANNEL_ID = "fight_tracker_channel"
         var startTime = 0L
+
+        /** ML Kit refuses images smaller than 32x32 px. */
+        private const val MIN_OCR_SIZE = 32
+
+        /** true = wyłącza automatyczne ucinanie lewej strony (czerwony pixel / ikona gold) */
+        private const val DISABLE_LEFT_CROP = true
+
+        @Volatile
+        var instance: FightTrackerService? = null
+
+        /** Called from the overlay. Returns false when there is nothing to undo. */
+        fun undoLast(): Boolean = instance?.undoLastReward() ?: false
     }
+
+    /** One applied reward (used by the undo button). */
+    private data class RewardDelta(
+        val gold: Long,
+        val orns: Long,
+        val exp: Long,
+        val shards: Long,
+        val proofs: Map<String, Long>
+    )
+
+    private val rewardHistory = ArrayDeque<RewardDelta>()
 
     private var totalGold = 0L
     private var totalOrns = 0L
     private var totalExp = 0L
     private var totalShards = 0L
+    private val totalProofs = mutableMapOf<String, Long>()
 
     private var lastShards = -1L
     private var lastGold = -1L
     private var lastOrns = -1L
     private var lastExp = -1L
+    private var lastProofs: Map<String, Long> = emptyMap()
 
     private var ocrBusy = false
 
@@ -59,6 +84,11 @@ class FightTrackerService : Service() {
 
     private val recognizer =
         TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+
+    override fun onCreate() {
+        super.onCreate()
+        instance = this
+    }
 
     override fun onStartCommand(
         intent: Intent?,
@@ -172,6 +202,59 @@ class FightTrackerService : Service() {
         }, interval)
     }
 
+    /**
+     * Loads the user's crop and converts it to pixels.
+     *
+     * Protects against broken saved crops:
+     *  - inverted rectangles (left > right / top > bottom)
+     *  - rectangles smaller than ML Kit's 32x32 px minimum
+     *
+     * In those cases the default 20%-80% crop is used.
+     */
+    private fun resolveCrop(fullWidth: Int, fullHeight: Int): Rect {
+
+        val saved = CropStore.load(this)
+
+        var l = 0.2f
+        var t = 0.2f
+        var r = 0.8f
+        var b = 0.8f
+
+        if (saved != null) {
+
+            l = min(saved.left, saved.right)
+            r = max(saved.left, saved.right)
+            t = min(saved.top, saved.bottom)
+            b = max(saved.top, saved.bottom)
+        }
+
+        var rect = Rect(
+            (l * fullWidth).toInt().coerceIn(0, fullWidth - 1),
+            (t * fullHeight).toInt().coerceIn(0, fullHeight - 1),
+            (r * fullWidth).toInt().coerceIn(1, fullWidth),
+            (b * fullHeight).toInt().coerceIn(1, fullHeight)
+        )
+
+        if (
+            rect.width() < MIN_OCR_SIZE ||
+            rect.height() < MIN_OCR_SIZE
+        ) {
+
+            Log.w(
+                "CROP",
+                "Saved crop too small (${rect.width()}x${rect.height()}) - using default"
+            )
+
+            rect = Rect(
+                (0.2f * fullWidth).toInt(),
+                (0.2f * fullHeight).toInt(),
+                (0.8f * fullWidth).toInt(),
+                (0.8f * fullHeight).toInt()
+            )
+        }
+
+        return rect
+    }
 
     private fun detectLeftEdge(bitmap: Bitmap): Int {
 
@@ -453,16 +536,14 @@ class FightTrackerService : Service() {
         image.close()
 
         // -----------------------------
-        // 1. LOAD USER CROP (0..1)
+        // 1. LOAD USER CROP (validated)
         // -----------------------------
-        val savedCrop = CropStore.load(this)
+        val cropRect = resolveCrop(fullBitmap.width, fullBitmap.height)
 
-        val crop = savedCrop ?: RectF(0.2f, 0.2f, 0.8f, 0.8f)
-
-        val left = (crop.left * fullBitmap.width).toInt()
-        val top = (crop.top * fullBitmap.height).toInt()
-        val right = (crop.right * fullBitmap.width).toInt()
-        val bottom = (crop.bottom * fullBitmap.height).toInt()
+        val left = cropRect.left
+        val top = cropRect.top
+        val right = cropRect.right
+        val bottom = cropRect.bottom
 
         DebugOverlayData.userCropLeft = left
         DebugOverlayData.userCropRight = right
@@ -511,10 +592,12 @@ class FightTrackerService : Service() {
             else
                 max(0, detectLeftEdge(croppedBitmap) - 20)
 
+        // keep at least MIN_OCR_SIZE px of width
         adjustedLeft = adjustedLeft.coerceIn(
             0,
-            croppedBitmap.width - 20
+            (croppedBitmap.width - MIN_OCR_SIZE).coerceAtLeast(0)
         )
+        if (DISABLE_LEFT_CROP) adjustedLeft = 0
 
         DebugOverlayData.detectedLeft = adjustedLeft
         DebugOverlayData.bitmapWidth = croppedBitmap.width
@@ -542,8 +625,30 @@ class FightTrackerService : Service() {
         // -----------------------------
         // 2. OPTIONAL SCALING
         // -----------------------------
-        val scaling =
+        var scaling =
             if (SettingsStore.getHighQualityOcr(this)) 1 else 2
+
+        // never scale below ML Kit's minimum size
+        if (
+            finalBitmap.width / scaling < MIN_OCR_SIZE ||
+            finalBitmap.height / scaling < MIN_OCR_SIZE
+        ) {
+            scaling = 1
+        }
+
+        if (
+            finalBitmap.width < MIN_OCR_SIZE ||
+            finalBitmap.height < MIN_OCR_SIZE
+        ) {
+
+            Log.w("OCR_BITMAP", "Legacy OCR bitmap too small - skipping frame")
+
+            fullBitmap.recycle()
+            croppedBitmap.recycle()
+            finalBitmap.recycle()
+
+            return
+        }
 
         val scaledBitmap = Bitmap.createScaledBitmap(
             finalBitmap,
@@ -606,6 +711,11 @@ class FightTrackerService : Service() {
             }
             .addOnFailureListener { e ->
                 Log.e("OCR_RAW", "OCR FAILED", e)
+
+                recycleBitmapSafe(fullBitmap)
+                recycleBitmapSafe(croppedBitmap)
+                recycleBitmapSafe(finalBitmap)
+                recycleBitmapSafe(scaledBitmap)
             }
     }
 
@@ -656,17 +766,7 @@ class FightTrackerService : Service() {
                 image.close()
             }
 
-            // 1. LOAD USER CROP (0..1)
-
-            val savedCrop = CropStore.load(this)
-
-            val crop =
-                savedCrop ?: RectF(
-                    0.2f,
-                    0.2f,
-                    0.8f,
-                    0.8f
-                )
+            // 1. LOAD USER CROP (validated, min 32x32 px)
 
             val full = fullBitmap
                 ?: run {
@@ -674,17 +774,13 @@ class FightTrackerService : Service() {
                     return
                 }
 
-            val left =
-                (crop.left * full.width).toInt()
+            val cropRect =
+                resolveCrop(full.width, full.height)
 
-            val top =
-                (crop.top * full.height).toInt()
-
-            val right =
-                (crop.right * full.width).toInt()
-
-            val bottom =
-                (crop.bottom * full.height).toInt()
+            val left = cropRect.left
+            val top = cropRect.top
+            val right = cropRect.right
+            val bottom = cropRect.bottom
 
             DebugOverlayData.userCropLeft = left
             DebugOverlayData.userCropRight = right
@@ -952,12 +1048,15 @@ class FightTrackerService : Service() {
                                 )
                         }
 
-                        // Protect safety boundary constraints
+                        // Protect safety boundary constraints.
+                        // Keep at least MIN_OCR_SIZE px of width.
                         adjustedLeft =
                             adjustedLeft.coerceIn(
                                 0,
-                                croppedBitmap!!.width - 20
+                                (croppedBitmap!!.width - MIN_OCR_SIZE)
+                                    .coerceAtLeast(0)
                             )
+                        if (DISABLE_LEFT_CROP) adjustedLeft = 0
 
                         DebugOverlayData.detectedLeft =
                             adjustedLeft
@@ -995,7 +1094,7 @@ class FightTrackerService : Service() {
 
                         // SECOND OCR PASS - REAL TRACKING
 
-                        val scaling =
+                        var scaling =
                             if (
                                 SettingsStore.getHighQualityOcr(this)
                             ) {
@@ -1003,6 +1102,40 @@ class FightTrackerService : Service() {
                             } else {
                                 2
                             }
+
+                        // never scale below ML Kit's minimum size
+                        if (
+                            finalBitmap!!.width / scaling < MIN_OCR_SIZE ||
+                            finalBitmap!!.height / scaling < MIN_OCR_SIZE
+                        ) {
+                            scaling = 1
+                        }
+
+                        if (
+                            finalBitmap!!.width < MIN_OCR_SIZE ||
+                            finalBitmap!!.height < MIN_OCR_SIZE
+                        ) {
+
+                            Log.w(
+                                "OCR_RAW",
+                                "Second pass bitmap too small " +
+                                        "(${finalBitmap!!.width}x${finalBitmap!!.height}) - skipping frame"
+                            )
+
+                            recycleBitmapSafe(scaledBitmap)
+                            recycleBitmapSafe(finalBitmap)
+                            recycleBitmapSafe(croppedBitmap)
+                            recycleBitmapSafe(fullBitmap)
+
+                            scaledBitmap = null
+                            finalBitmap = null
+                            croppedBitmap = null
+                            fullBitmap = null
+
+                            ocrBusy = false
+
+                            return@addOnSuccessListener
+                        }
 
                         scaledBitmap =
                             Bitmap.createScaledBitmap(
@@ -1424,6 +1557,139 @@ class FightTrackerService : Service() {
             .toLongOrNull() ?: 0
     }
 
+    /**
+     * Counts proofs / skeleton keys for the currently selected
+     * tracking mode.
+     *
+     * Works on the WHOLE OCR text with all whitespace collapsed,
+     * so names wrapped to two lines still match:
+     *
+     *   "Proof of Beast"
+     *   "Slain (3)"
+     *
+     * "(3)" after the name = +3, no number = +1.
+     */
+    private fun parseProofs(rawText: String): Map<String, Long> {
+
+        val result = mutableMapOf<String, Long>()
+
+        val flat =
+            rawText
+                .lowercase()
+                .replace(Regex("\\s+"), " ")
+
+        // optional "(3)" - brackets tolerate typical OCR mistakes
+        val countPart =
+            """(?:\s*[(\[{]\s*(\d{1,4})\s*[)\]}]?)?"""
+
+        for (proof in ProofTracking.activeProofs(this)) {
+
+            val regex =
+                Regex(proof.pattern + countPart)
+
+            var total = 0L
+
+            for (match in regex.findAll(flat)) {
+
+                total +=
+                    match.groupValues[1].toLongOrNull() ?: 1L
+            }
+
+            if (total > 0L) {
+                result[proof.id] = total
+            }
+        }
+
+        return result
+    }
+
+    /** Copies service totals into FightState (read by the UI / overlay). */
+    private fun publishTotals() {
+
+        FightState.gold = totalGold
+        FightState.orns = totalOrns
+        FightState.exp = totalExp
+        FightState.shards = totalShards
+
+        FightState.proofs.clear()
+        FightState.proofs.putAll(totalProofs)
+    }
+
+    /** Adds one reward to the totals and remembers it for undo. */
+    private fun applyReward(d: RewardDelta) {
+
+        totalGold += d.gold
+        totalOrns += d.orns
+        totalExp += d.exp
+        totalShards += d.shards
+
+        for ((id, c) in d.proofs) {
+            totalProofs[id] = (totalProofs[id] ?: 0L) + c
+        }
+
+        publishTotals()
+
+        rewardHistory.addLast(d)
+        if (rewardHistory.size > 20) rewardHistory.removeFirst()
+
+        FightState.lastGold = d.gold
+        FightState.lastOrns = d.orns
+        FightState.lastExp = d.exp
+        FightState.lastShards = d.shards
+        FightState.lastProofs = d.proofs
+
+        val msg =
+            "STATE UPDATE -> +${d.exp} EXP +${d.gold} Gold +${d.orns} Orns " +
+                    "+${d.shards} Shards proofs=${d.proofs}"
+
+        val totals =
+            "STATE UPDATE -> EXP=$totalExp GOLD=$totalGold ORNS=$totalOrns " +
+                    "SHARDS=$totalShards PROOFS=$totalProofs"
+
+        Log.d("TRACKER_LOG", msg)
+        TrackerLogger.write("TRACKER_LOG", msg)
+        Log.d("TRACKER_LOG", totals)
+        TrackerLogger.write("TRACKER_LOG", totals)
+    }
+
+    /** Removes the most recently applied reward. */
+    fun undoLastReward(): Boolean {
+
+        val d = rewardHistory.removeLastOrNull() ?: return false
+
+        totalGold = (totalGold - d.gold).coerceAtLeast(0L)
+        totalOrns = (totalOrns - d.orns).coerceAtLeast(0L)
+        totalExp = (totalExp - d.exp).coerceAtLeast(0L)
+        totalShards = (totalShards - d.shards).coerceAtLeast(0L)
+
+        for ((id, c) in d.proofs) {
+
+            val left = (totalProofs[id] ?: 0L) - c
+
+            if (left > 0L) {
+                totalProofs[id] = left
+            } else {
+                totalProofs.remove(id)
+            }
+        }
+
+        publishTotals()
+
+        // "Last reward" view falls back to the previous one
+        val prev = rewardHistory.lastOrNull()
+
+        FightState.lastGold = prev?.gold ?: 0L
+        FightState.lastOrns = prev?.orns ?: 0L
+        FightState.lastExp = prev?.exp ?: 0L
+        FightState.lastShards = prev?.shards ?: 0L
+        FightState.lastProofs = prev?.proofs ?: emptyMap()
+
+        Log.d("TRACKER_LOG", "UNDO -> removed $d")
+        TrackerLogger.write("TRACKER_LOG", "UNDO -> removed $d")
+
+        return true
+    }
+
     private fun parseRewards(text: String) {
 
         val lines = text.lines()
@@ -1471,25 +1737,16 @@ class FightTrackerService : Service() {
             }
         }
 
-        val hasReward =
-            sessionGold > 0 ||
-                    sessionOrns > 0 ||
-                    sessionExp > 0 ||
-                    sessionShards > 0
-
-        if (hasReward) {
-            FightState.lastGold = sessionGold
-            FightState.lastOrns = sessionOrns
-            FightState.lastExp = sessionExp
-            FightState.lastShards = sessionShards
-        }
+        // proofs / keys are parsed from the whole text (names can wrap)
+        val sessionProofs = parseProofs(text)
 
         // duplicate check
         if (
             sessionGold == lastGold &&
             sessionOrns == lastOrns &&
             sessionExp == lastExp &&
-            sessionShards == lastShards
+            sessionShards == lastShards &&
+            sessionProofs == lastProofs
         ) {
             return
         }
@@ -1499,8 +1756,17 @@ class FightTrackerService : Service() {
         lastOrns = sessionOrns
         lastExp = sessionExp
         lastShards = sessionShards
+        lastProofs = sessionProofs
 
-        // add only new results
+        val delta = RewardDelta(
+            sessionGold,
+            sessionOrns,
+            sessionExp,
+            sessionShards,
+            sessionProofs
+        )
+
+        // unusually high orns -> ask the user first
         if (sessionOrns > FightState.ornsConfirmationThreshold) {
 
             RewardConfirmOverlayService.pendingOrns = sessionOrns
@@ -1508,17 +1774,7 @@ class FightTrackerService : Service() {
             RewardConfirmOverlayService.onResult = { accepted ->
 
                 if (accepted) {
-
-                    totalGold += sessionGold
-                    totalOrns += sessionOrns
-                    totalExp += sessionExp
-                    totalShards += sessionShards
-
-                    FightState.gold = totalGold
-                    FightState.orns = totalOrns
-                    FightState.exp = totalExp
-                    FightState.shards = totalShards
-
+                    applyReward(delta)
                 }
                 // if denied, do nothing
             }
@@ -1530,32 +1786,7 @@ class FightTrackerService : Service() {
             return
         }
 
-        totalGold += sessionGold
-        totalOrns += sessionOrns
-        totalExp += sessionExp
-        totalShards += sessionShards
-
-        FightState.gold = totalGold
-        FightState.orns = totalOrns
-        FightState.exp = totalExp
-        FightState.shards = totalShards
-
-        Log.d(
-            "TRACKER_LOG",
-            "STATE UPDATE -> +$sessionExp EXP +$sessionGold Gold +$sessionOrns Orns +$sessionShards Shards"
-            )
-        TrackerLogger.write(
-            "TRACKER_LOG",
-            "STATE UPDATE -> +$sessionExp EXP +$sessionGold Gold +$sessionOrns Orns +$sessionShards Shards"
-        )
-        Log.d(
-            "TRACKER_LOG",
-            "STATE UPDATE -> EXP=$totalExp GOLD=$totalGold ORNS=$totalOrns SHARDS=$totalShards"
-        )
-        TrackerLogger.write(
-            "TRACKER_LOG",
-            "STATE UPDATE -> EXP=$totalExp GOLD=$totalGold ORNS=$totalOrns SHARDS=$totalShards"
-        )
+        applyReward(delta)
     }
 
     private fun extractNumber(text: String): Long {
@@ -1567,6 +1798,8 @@ class FightTrackerService : Service() {
     }
 
     override fun onDestroy() {
+
+        instance = null
 
         virtualDisplay?.release()
         imageReader?.close()

@@ -236,6 +236,10 @@ class MainActivity : AppCompatActivity() {
 
                 startForegroundService(intent)
                 startService(Intent(this, OverlayService::class.java))
+
+                // tracking is really running now
+                TrackingController.isRunning = true
+                recording = 1
             }
         }
 
@@ -315,11 +319,27 @@ class MainActivity : AppCompatActivity() {
             binding.viewPager.setCurrentItem(openTab, false)
         }
 
+        handleIntentAction(intent)
+    }
+
+    /**
+     * Handles actions sent by overlays / notifications.
+     * Used both by onNewIntent (activity already alive)
+     * and onCreate (activity had to be created first).
+     */
+    private fun handleIntentAction(intent: Intent) {
+
         when (intent.action) {
 
             ACTION_START_TRACKING -> {
-                FightState.startTime = System.currentTimeMillis()
-                startCapture()
+
+                if (!TrackingController.isRunning) {
+
+                    FightState.startTime = System.currentTimeMillis()
+                    FightState.ornsConfirmationThreshold = 3_000_000L
+
+                    startCapture()
+                }
             }
 
             ACTION_STOP_TRACKING -> {
@@ -346,54 +366,15 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    /**
+     * Stops tracking, saves the run and closes the stats overlay.
+     */
     fun stopTracking() {
 
-        stopService(Intent(this, FightTrackerService::class.java))
-
-        stopService(Intent(this, OverlayService::class.java))
-
-        val endTime = System.currentTimeMillis()
-
-        val durationMillis = endTime - FightState.startTime
-
-        val seconds = durationMillis / 1000
-        val minutes = seconds / 60
-        val hours = minutes / 60
-
-        val duration =
-            String.format(
-                "%02d:%02d:%02d",
-                hours,
-                minutes % 60,
-                seconds % 60
-            )
-
-        val date =
-            SimpleDateFormat(
-                "yyyy-MM-dd HH:mm",
-                Locale.getDefault()
-            ).format(Date())
-
-        val runid = System.currentTimeMillis().toString()
-
-        RunStorage.saveRun(
+        TrackingController.stopAndSave(
             this,
-            RunRecord(
-                runid,
-                date,
-                duration,
-                FightState.gold,
-                FightState.orns,
-                FightState.exp,
-                FightState.shards,
-                ""
-            )
+            closeOverlay = true
         )
-
-        FightState.gold = 0L
-        FightState.orns = 0L
-        FightState.exp = 0L
-        FightState.shards = 0L
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -403,20 +384,20 @@ class MainActivity : AppCompatActivity() {
         windowInsetsController.hide(WindowInsetsCompat.Type.statusBars())
         UpdateChecker.check(this)
 
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
 
-        val alarmManager =
-            getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val alarmManager =
+                getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-        if (!alarmManager.canScheduleExactAlarms()) {
+            if (!alarmManager.canScheduleExactAlarms()) {
 
-            val intent = Intent(
-                Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM
-            )
+                val intent = Intent(
+                    Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM
+                )
 
-            startActivity(intent)
+                startActivity(intent)
+            }
         }
-    }
 
 
         MaterialAlarmScheduler.schedule(this)
@@ -445,7 +426,7 @@ class MainActivity : AppCompatActivity() {
                 )
             } else {
                 Log.d("Notifications", "checking materials")
-                
+
             }
 
         } else {
@@ -453,9 +434,9 @@ class MainActivity : AppCompatActivity() {
 
         }
 
-    if (FirstRunStore.shouldShow(this)) {
-        startActivity(Intent(this, FirstRunActivity::class.java))
-    }
+        if (FirstRunStore.shouldShow(this)) {
+            startActivity(Intent(this, FirstRunActivity::class.java))
+        }
 
         projectionManager =
             getSystemService(
@@ -546,6 +527,14 @@ class MainActivity : AppCompatActivity() {
         if (openTab >= 0) {
             binding.viewPager.post {
                 binding.viewPager.setCurrentItem(openTab, false)
+            }
+        }
+
+        // Activity was created by an overlay action (e.g. Start button
+        // pressed while the app was not alive) - handle it now.
+        if (savedInstanceState == null) {
+            binding.root.post {
+                handleIntentAction(intent)
             }
         }
 

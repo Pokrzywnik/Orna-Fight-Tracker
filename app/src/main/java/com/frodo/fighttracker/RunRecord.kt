@@ -8,5 +8,6 @@ data class RunRecord(
     val orns: Long,
     val exp: Long,
     val shards: Long,
-    val name: String = ""
+    val name: String = "",
+    val proofs: Map<String, Long> = emptyMap()
 )

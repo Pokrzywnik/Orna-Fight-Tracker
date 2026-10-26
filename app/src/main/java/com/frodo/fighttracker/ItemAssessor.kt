@@ -880,19 +880,16 @@ class ItemAssessor {
         /*
          * Reverse engineer quality.
          *
-         * We calculate an interval instead of one
-         * exact value because the game rounds.
+         * All stats, including Ward, use:
+         *
+         *     ceil(scaledBase * quality)
+         *
          */
         val range =
             reverseQualityRange(
                 actualValue = actualValue,
                 scaledBase = scaledBase,
-                qualityBonus = qualityBonus,
-                isWard =
-                    statName.equals(
-                        "Ward",
-                        ignoreCase = true
-                    )
+                qualityBonus = qualityBonus
             )
 
         if (range == null) {
@@ -1371,21 +1368,9 @@ class ItemAssessor {
         isWard: Boolean
     ): Double {
 
-        return if (isWard) {
-
-            ceil(
-                scaledBase *
-                        quality *
-                        100.0
-            ) / 100.0
-
-        } else {
-
-            ceil(
-                scaledBase *
-                        quality
-            )
-        }
+        return ceil(
+            scaledBase * quality
+        )
     }
 
     /**
@@ -1406,44 +1391,12 @@ class ItemAssessor {
         actualValue: Double,
         scaledBase: Double,
         qualityBonus: Double,
-        isWard: Boolean
     ): Pair<Double, Double>? {
 
         if (scaledBase == 0.0) {
             return null
         }
 
-        if (isWard) {
-
-            /*
-             * Ward is calculated with two decimal places.
-             */
-            val actual =
-                actualValue
-
-            val lower =
-                (actual - 0.01) /
-                        scaledBase
-
-            val upper =
-                actual /
-                        scaledBase
-
-            val minQuality =
-                lower - qualityBonus
-
-            val maxQuality =
-                upper - qualityBonus
-
-            return normalizeRange(
-                minQuality,
-                maxQuality
-            )
-        }
-
-        /*
-         * Normal integer stat.
-         */
         val lower =
             (actualValue - 1.0) /
                     scaledBase
