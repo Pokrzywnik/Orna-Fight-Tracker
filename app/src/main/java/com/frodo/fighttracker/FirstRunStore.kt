@@ -7,7 +7,7 @@ object FirstRunStore {
     private const val PREF = "first_run_pref"
     private const val KEY = "guide_version"
 
-    private const val CURRENT_GUIDE_VERSION = 8
+    private const val CURRENT_GUIDE_VERSION = 9
 
     fun shouldShow(context: Context): Boolean {
         val shown = context
