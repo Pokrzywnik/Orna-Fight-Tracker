@@ -25,6 +25,7 @@ class FirstRunActivity : Activity() {
                 • Added Gleaming Codex
                 • Added filters/search in run history
                 • Experimental OCR released - should be fast and accurate
+                • Added interface scaling option in settings
                 
                 If you encounter any bugs - feel free to hit me up on discord - Frodo9382
                 
