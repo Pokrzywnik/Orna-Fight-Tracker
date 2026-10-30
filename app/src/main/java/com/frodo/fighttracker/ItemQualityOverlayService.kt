@@ -162,23 +162,26 @@ class ItemQualityOverlayService : Service() {
 
         return when {
 
-            percentage >= 200.0 ->
+            percentage >= 170.0 ->
                 "ornate"
 
-            percentage >= 170.0 ->
+            percentage >= 140.0 ->
                 "legendary"
 
-            percentage >= 140.0 ->
+            percentage >= 120.0 ->
                 "famed"
 
-            percentage >= 120.0 ->
+            percentage >= 101.0 ->
                 "superior"
 
             percentage >= 100.0 ->
                 "normal"
 
-            percentage >= 70.0 ->
+            percentage >= 90.0 ->
                 "poor"
+
+            percentage >= 70.0 ->
+                "broken"
 
             else ->
                 "broken"

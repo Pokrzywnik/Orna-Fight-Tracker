@@ -18,7 +18,7 @@ class PaddleOcrDetector(
         private const val TAG = "PaddleOCR-DET"
 
         private const val MODEL_FILE =
-            "ocr/det/inference.onnx"
+            "ocr/det/model3/inference.onnx"
 
         /*
          * PP-OCR DB parameters
@@ -29,9 +29,9 @@ class PaddleOcrDetector(
         private const val DB_MAX_CANDIDATES = 3000
 
         /*
-         * Input resize.
+         * Default input resize (used by item assessment).
          */
-        private const val MAX_SIDE_LEN = 512
+        const val MAX_SIDE_LEN = 512
         private const val STRIDE = 32
     }
 
@@ -90,8 +90,11 @@ class PaddleOcrDetector(
                 it.readBytes()
             }
 
-        val sessionOptions =
-            OrtSession.SessionOptions()
+        val sessionOptions = OrtSession.SessionOptions().apply {
+            setIntraOpNumThreads(2)  // try 4, or the number of big cores on your phone
+            setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
+            addXnnpack(mapOf("intra_op_num_threads" to "2"))
+        }
 
         ortSession =
             ortEnvironment.createSession(
@@ -119,8 +122,15 @@ class PaddleOcrDetector(
      * Detect text regions.
      *
      * Returned points are in ORIGINAL bitmap coordinates.
+     *
+     * maxSideLen = longest side of the image fed to the model.
+     * Item assessment uses the default (512). Reward OCR passes
+     * a bigger value because it scans a whole screen.
      */
-    fun detect(bitmap: Bitmap): List<TextBox> {
+    fun detect(
+        bitmap: Bitmap,
+        maxSideLen: Int = MAX_SIDE_LEN
+    ): List<TextBox> {
 
         if (bitmap.width <= 0 || bitmap.height <= 0) {
             return emptyList()
@@ -139,7 +149,8 @@ class PaddleOcrDetector(
         val resizeInfo =
             calculateResize(
                 bitmap.width,
-                bitmap.height
+                bitmap.height,
+                maxSideLen
             )
 
         val resizedBitmap =
@@ -336,6 +347,7 @@ class PaddleOcrDetector(
 
             return emptyList()
         }
+
 
         val boxes =
             dbPostProcess(
@@ -582,7 +594,8 @@ class PaddleOcrDetector(
      */
     private fun calculateResize(
         originalWidth: Int,
-        originalHeight: Int
+        originalHeight: Int,
+        maxSideLen: Int
     ): ResizeInfo {
 
         val maxSide =
@@ -592,9 +605,9 @@ class PaddleOcrDetector(
             )
 
         val scale =
-            if (maxSide > MAX_SIDE_LEN) {
+            if (maxSide > maxSideLen) {
 
-                MAX_SIDE_LEN.toFloat() /
+                maxSideLen.toFloat() /
                         maxSide.toFloat()
 
             } else {
@@ -626,16 +639,16 @@ class PaddleOcrDetector(
          * Limit only if rounding pushed us beyond
          * the configured maximum.
          */
-        if (resizedWidth > MAX_SIDE_LEN) {
+        if (resizedWidth > maxSideLen) {
 
             resizedWidth =
-                (MAX_SIDE_LEN / STRIDE) * STRIDE
+                (maxSideLen / STRIDE) * STRIDE
         }
 
-        if (resizedHeight > MAX_SIDE_LEN) {
+        if (resizedHeight > maxSideLen) {
 
             resizedHeight =
-                (MAX_SIDE_LEN / STRIDE) * STRIDE
+                (maxSideLen / STRIDE) * STRIDE
         }
 
         val ratioWidth =
@@ -998,18 +1011,8 @@ class PaddleOcrDetector(
         /*
          * IMPORTANT:
          *
-         * The ONNX output is:
-         *
-         * 448 x 960
-         *
-         * while the input is:
-         *
-         * 448 x 960
-         *
-         * for your current model.
-         *
-         * Therefore we calculate the mapping dynamically
-         * instead of assuming output = input / 4.
+         * We calculate the output -> resized-image mapping
+         * dynamically instead of assuming output = input / 4.
          */
         val outputScaleX =
             resizeInfo.resizedWidth.toFloat() /

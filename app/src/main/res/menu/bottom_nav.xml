@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_tracker"
+        android:icon="@drawable/ic_ft_tracker"
+        android:title="@string/ft_nav_tracker" />
+    <item
+        android:id="@+id/nav_materials"
+        android:icon="@drawable/ic_ft_materials"
+        android:title="@string/ft_nav_materials" />
+    <item
+        android:id="@+id/nav_codex"
+        android:icon="@drawable/ic_ft_codex"
+        android:title="@string/ft_nav_codex" />
+    <item
+        android:id="@+id/nav_gleaming"
+        android:icon="@drawable/ic_ft_gleaming"
+        android:title="@string/ft_nav_gleaming" />
+    <item
+        android:id="@+id/nav_guides"
+        android:icon="@drawable/ic_ft_guides"
+        android:title="@string/ft_nav_guides" />
+</menu>

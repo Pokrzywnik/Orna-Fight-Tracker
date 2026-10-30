@@ -1,46 +1,114 @@
 package com.frodo.fighttracker
 
-import android.graphics.Typeface
 import android.os.Bundle
-import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.core.content.ContextCompat
+import androidx.core.widget.TextViewCompat
 import androidx.fragment.app.Fragment
 import coil.load
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import com.google.android.material.checkbox.MaterialCheckBox
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
-import com.google.android.material.button.MaterialButton
-import androidx.appcompat.content.res.AppCompatResources
 
+/**
+ * Materials tab. Data and behaviour are unchanged - only the look
+ * (header, cards, spacing, dialogs) follows the new design tokens.
+ */
 class MaterialsFragment : Fragment() {
 
     private lateinit var root: LinearLayout
 
-    private fun getFiles(): List<String> {
-        val anguish = when (SettingsStore.getAnguishVersion(requireContext())) {
-            "2.0" -> "anguish_2_0.csv"
-            else -> "anguish_1_0.csv"
+    // ------------------------------------------------------------------
+    // small view helpers
+    // ------------------------------------------------------------------
+
+    private fun dp(value: Int): Int = UiKit.dp(requireContext(), value)
+
+    private fun color(res: Int): Int = ContextCompat.getColor(requireContext(), res)
+
+    private fun text(
+        value: String,
+        appearance: Int,
+        sizeSp: Float? = null
+    ): TextView = TextView(requireContext()).apply {
+        setTextAppearance(appearance)
+        text = value
+        if (sizeSp != null) textSize = sizeSp
+    }
+
+    private fun card(): LinearLayout = LinearLayout(requireContext()).apply {
+
+        orientation = LinearLayout.VERTICAL
+        setBackgroundResource(R.drawable.bg_card)
+        setPadding(dp(10), dp(12), dp(10), dp(12))
+
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            bottomMargin = dp(12)
+        }
+    }
+
+    private fun searchField(hintText: String): EditText =
+        EditText(requireContext()).apply {
+            setTextAppearance(R.style.TextAppearance_FT_Body)
+            hint = hintText
+            setHintTextColor(color(R.color.ft_muted))
+            setBackgroundResource(R.drawable.bg_search)
+            setPadding(dp(12), 0, dp(12), 0)
+            maxLines = 1
+            inputType = android.text.InputType.TYPE_CLASS_TEXT
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(44)
+            ).apply {
+                bottomMargin = dp(8)
+            }
         }
 
-        return listOf(
-            "remembrance.csv",
-            "coral.csv",
-            anguish,
-            "sparring.csv",
-            "trials.csv",
-            "towers.csv",
-            "towers_hoa.csv"
+    private fun dialogScrollHeight(): Int =
+        (resources.displayMetrics.heightPixels * 0.5f).toInt()
+
+    private fun afterTextChanged(edit: EditText, onChange: (String) -> Unit) {
+
+        edit.addTextChangedListener(
+            object : android.text.TextWatcher {
+
+                override fun beforeTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    count: Int,
+                    after: Int
+                ) {}
+
+                override fun onTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    before: Int,
+                    count: Int
+                ) {
+                    onChange(s.toString())
+                }
+
+                override fun afterTextChanged(s: android.text.Editable?) {}
+            }
         )
     }
+
+    // ------------------------------------------------------------------
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -51,11 +119,15 @@ class MaterialsFragment : Fragment() {
         SelectedMaterials.load(requireContext())
         SelectedGuilds.load(requireContext())
 
-        val scroll = ScrollView(requireContext())
+        val scroll = ScrollView(requireContext()).apply {
+            setBackgroundColor(color(R.color.ft_bg))
+            clipToPadding = false
+            isVerticalScrollBarEnabled = false
+        }
 
         root = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(24, 24, 24, 24)
+            setPadding(dp(16), dp(20), dp(16), dp(24))
         }
 
         scroll.addView(root)
@@ -72,7 +144,7 @@ class MaterialsFragment : Fragment() {
 
     private fun guildDisplayName(file: String): String {
 
-        return when(file) {
+        return when (file) {
             "anguish_1_0.csv" -> "Anguish 1.0"
             "anguish_2_0.csv" -> "Anguish 2.0"
             "remembrance.csv" -> "Remembrance"
@@ -91,22 +163,29 @@ class MaterialsFragment : Fragment() {
         AuraNotifier.refresh = null
     }
 
+    private fun enabledFiles(): List<String> =
+        MaterialAvailability.files(requireContext())
+            .filter { SelectedGuilds.isEnabled(it) }
+
+    private fun loadCsv(file: String): List<MaterialEntry> =
+        MaterialAvailability.loadCsv(requireContext(), file)
+
+    private fun parseItems(raw: String): List<String> =
+        MaterialAvailability.parseItems(raw)
+
     private fun rebuildMaterials() {
 
         if (!::root.isInitialized) return
 
         root.removeAllViews()
 
-        val today = getDateString(0)
-        val tomorrow = getDateString(1)
+        val today = MaterialAvailability.dateString(0)
+        val tomorrow = MaterialAvailability.dateString(1)
 
-        val allEntries = mutableListOf<MaterialEntry>()
+        // every enabled CSV is read once per rebuild
+        val entriesByFile = enabledFiles().associateWith { loadCsv(it) }
 
-        getFiles()
-            .filter { SelectedGuilds.isEnabled(it) }
-            .forEach {
-                allEntries.addAll(loadCsv(it))
-            }
+        val allEntries = entriesByFile.values.flatten()
 
         val todayItems = allEntries
             .filter { it.date.equals(today, true) }
@@ -120,125 +199,87 @@ class MaterialsFragment : Fragment() {
             .distinct()
             .sorted()
 
-        root.addView(createTodayHeader())
-        root.addView(createMaterialsGrid(todayItems))
+        root.addView(createHeader())
 
-        root.addView(sectionTitle("Materials Tomorrow"))
-        root.addView(createMaterialsGrid(tomorrowItems))
+        root.addView(sectionTitle(getString(R.string.ft_materials_today)))
+        root.addView(createGridCard(todayItems))
 
-        
+        root.addView(sectionTitle(getString(R.string.ft_materials_tomorrow)))
+        root.addView(createGridCard(tomorrowItems))
 
-        getFiles()
-            .filter { SelectedGuilds.isEnabled(it) }
-            .forEach { file ->
+        entriesByFile.forEach { (file, entries) ->
 
-                val entries = loadCsv(file)
+            val todayEntry =
+                entries.find { it.date.equals(today, true) }
 
-                val todayEntry =
-                    entries.find { it.date.equals(today, true) }
+            val tomorrowEntry =
+                entries.find { it.date.equals(tomorrow, true) }
 
-                val tomorrowEntry =
-                    entries.find { it.date.equals(tomorrow, true) }
-
-                root.addView(
-                    createGuildCard(
-                        guildDisplayName(file),
-                        todayEntry,
-                        tomorrowEntry
-                    )
+            root.addView(
+                createGuildCard(
+                    guildDisplayName(file),
+                    todayEntry,
+                    tomorrowEntry
                 )
-            }
-    }
-
-    private fun sectionTitle(text: String): View {
-
-        return TextView(requireContext()).apply {
-            this.text = text
-            textSize = 24f
-            setTypeface(null, Typeface.BOLD)
-            setPadding(0, 24, 0, 24)
+            )
         }
     }
 
-    private fun createGuildPairHeader(left: String, right: String): View {
+    // ------------------------------------------------------------------
+    // header + sections
+    // ------------------------------------------------------------------
 
-        val row = LinearLayout(requireContext()).apply {
+    private fun sectionTitle(title: String): View {
+
+        return text(title, R.style.TextAppearance_FT_Section).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(20)
+                bottomMargin = dp(8)
+            }
+        }
+    }
+
+    private fun createHeaderAction(
+        iconRes: Int,
+        description: String,
+        onClick: () -> Unit
+    ): View {
+
+        return ImageButton(requireContext()).apply {
+
+            layoutParams = LinearLayout.LayoutParams(dp(40), dp(40)).apply {
+                marginStart = dp(8)
+            }
+
+            setBackgroundResource(R.drawable.bg_icon_button)
+            setImageResource(iconRes)
+            scaleType = ImageView.ScaleType.CENTER
+            imageTintList = android.content.res.ColorStateList.valueOf(color(R.color.ft_text))
+            contentDescription = description
+
+            setOnClickListener { onClick() }
+        }
+    }
+
+    /** Overline + "Materials" title on the left, four 40dp icon buttons on the right. */
+    private fun createHeader(): View {
+
+        val ctx = requireContext()
+
+        val row = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         }
 
-        fun buildCell(text: String): View {
-            return LinearLayout(requireContext()).apply {
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                gravity = Gravity.CENTER
-            }.apply {
-                addView(TextView(requireContext()).apply {
-                    this.text = text
-                    textSize = 14f
-                    setTypeface(null, Typeface.BOLD)
-                    gravity = Gravity.CENTER
-                })
-            }
-        }
-
-        row.addView(buildCell(left))
-        row.addView(buildCell(right))
-
-        return row
-    }
-
-    private fun createGuildLabel(text: String, iconName: String): View {
-
-        val container = LinearLayout(requireContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-        }
-
-        val icon = ImageView(requireContext()).apply {
-
-            val dp = resources.displayMetrics.density
-            val size = (26 * dp).toInt()
-
-            layoutParams = LinearLayout.LayoutParams(size, size)
-
-            val asset = try {
-                requireContext().assets.open("$iconName.png")
-            } catch (e: Exception) {
-                null
-            }
-
-            if (asset != null) {
-                setImageDrawable(android.graphics.drawable.Drawable.createFromStream(asset, null))
-            }
-        }
-
-        val label = TextView(requireContext()).apply {
-            this.text = text
-            textSize = 15f
-            setTypeface(null, Typeface.BOLD)
-            setPadding(6, 0, 0, 0)
-        }
-
-        container.addView(icon)
-        container.addView(label)
-
-        return container
-    }
-
-    private fun createHeaderAction(
-        iconRes: Int,
-        label: String,
-        onClick: () -> Unit
-    ): View {
-
-        val root = LinearLayout(requireContext()).apply {
+        val titles = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(16, 8, 16, 8)
-
             layoutParams = LinearLayout.LayoutParams(
                 0,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -246,133 +287,79 @@ class MaterialsFragment : Fragment() {
             )
         }
 
-        val icon = ImageView(requireContext()).apply {
+        titles.addView(
+            text(getString(R.string.ft_overline_forecast), R.style.TextAppearance_FT_Overline)
+        )
 
-            val color = com.google.android.material.color.MaterialColors.getColor(
-                context,
-                com.google.android.material.R.attr.colorPrimary,
-                "getColor"
-            )
-            setColorFilter(color)
-            val dp = resources.displayMetrics.density
-            val size = (32 * dp).toInt()
+        val title = text(getString(R.string.ft_materials_title), R.style.TextAppearance_FT_Title)
 
-            layoutParams = LinearLayout.LayoutParams(size, size)
+        // four buttons + title must fit on a 360dp phone
+        title.maxLines = 1
+        TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+            title, 20, 28, 1, android.util.TypedValue.COMPLEX_UNIT_SP
+        )
 
-            setImageResource(iconRes)
+        titles.addView(title)
 
-            scaleType = ImageView.ScaleType.FIT_CENTER
-        }
+        row.addView(titles)
 
-        val text = TextView(requireContext()).apply {
-            this.text = label
-            textSize = 12f
-            gravity = Gravity.CENTER
-            setPadding(0, 6, 0, 0)
-        }
-
-        root.addView(icon)
-        root.addView(text)
-
-        root.setOnClickListener { onClick() }
-
-        return root
-    }
-
-    private fun createTodayHeader(): View {
-
-        val container = LinearLayout(requireContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, 24, 0, 24)
-        }
-
-
-        val title = TextView(requireContext()).apply {
-            text = "Materials Today"
-            textSize = 24f
-            setTypeface(null, Typeface.BOLD)
-
-            setPadding(0, 16, 0, 0)
-
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        }
-
-        val buttonRow = LinearLayout(requireContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.END
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        }
-
-
-        buttonRow.addView(
+        row.addView(
             createHeaderAction(
-                iconRes = R.drawable.ic_calendar_month,
-                label = "Calendar"
+                R.drawable.ic_calendar_month,
+                getString(R.string.ft_calendar)
             ) {
                 showMaterialCalendar()
             }
         )
 
-
-        buttonRow.addView(
+        row.addView(
             createHeaderAction(
-                iconRes = R.drawable.ic_explore,
-                label = "Guilds"
+                R.drawable.ic_explore,
+                getString(R.string.ft_guilds)
             ) {
                 showGuildSelector()
             }
         )
 
-
-        buttonRow.addView(
+        row.addView(
             createHeaderAction(
-                iconRes = R.drawable.ic_checklist,
-                label = "Materials"
+                R.drawable.ic_checklist,
+                getString(R.string.ft_materials_button)
             ) {
 
                 val allEntries = mutableListOf<MaterialEntry>()
 
-                getFiles()
-                    .filter { SelectedGuilds.isEnabled(it) }
-                    .forEach {
-                        allEntries.addAll(loadCsv(it))
-                    }
+                enabledFiles().forEach {
+                    allEntries.addAll(loadCsv(it))
+                }
 
                 showMaterialSelector(allEntries)
             }
         )
 
-
-        buttonRow.addView(
+        row.addView(
             createHeaderAction(
-                iconRes = R.drawable.ic_info,
-                label = "Info"
+                R.drawable.ic_info,
+                getString(R.string.ft_info)
             ) {
                 showCreditsDialog()
             }
         )
 
-        container.addView(buttonRow)
-        container.addView(title)
-
-        return container
+        return row
     }
+
+    // ------------------------------------------------------------------
+    // dialogs
+    // ------------------------------------------------------------------
 
     private fun showMaterialCalendar() {
 
         val allEntries = mutableListOf<MaterialEntry>()
 
-        getFiles()
-            .filter { SelectedGuilds.isEnabled(it) }
-            .forEach {
-                allEntries.addAll(loadCsv(it))
-            }
+        enabledFiles().forEach {
+            allEntries.addAll(loadCsv(it))
+        }
 
         val materials = allEntries
             .flatMap { parseItems(it.items) }
@@ -381,12 +368,10 @@ class MaterialsFragment : Fragment() {
 
         val layout = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(32, 32, 32, 32)
+            setPadding(dp(16), dp(8), dp(16), 0)
         }
 
-        val search = android.widget.EditText(requireContext()).apply {
-            hint = "Search material..."
-        }
+        val search = searchField(getString(R.string.ft_search_material))
 
         val scroll = ScrollView(requireContext())
 
@@ -431,30 +416,7 @@ class MaterialsFragment : Fragment() {
 
         render()
 
-        search.addTextChangedListener(
-            object : android.text.TextWatcher {
-
-                override fun beforeTextChanged(
-                    s: CharSequence?,
-                    start: Int,
-                    count: Int,
-                    after: Int
-                ) {}
-
-                override fun onTextChanged(
-                    s: CharSequence?,
-                    start: Int,
-                    before: Int,
-                    count: Int
-                ) {
-                    render(s.toString())
-                }
-
-                override fun afterTextChanged(
-                    s: android.text.Editable?
-                ) {}
-            }
-        )
+        afterTextChanged(search) { render(it) }
 
         layout.addView(search)
 
@@ -462,15 +424,14 @@ class MaterialsFragment : Fragment() {
             scroll,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f
+                dialogScrollHeight()
             )
         )
 
-        android.app.AlertDialog.Builder(requireContext())
-            .setTitle("Material Calendar")
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.ft_material_calendar)
             .setView(layout)
-            .setNegativeButton("Close", null)
+            .setNegativeButton(R.string.ft_close, null)
             .show()
     }
 
@@ -495,54 +456,53 @@ class MaterialsFragment : Fragment() {
 
         val occurrences = mutableListOf<MaterialOccurrence>()
 
-        getFiles()
-            .filter { SelectedGuilds.isEnabled(it) }
+        enabledFiles()
             .forEach { file ->
 
-            val guildName = guildDisplayName(file)
+                val guildName = guildDisplayName(file)
 
-            loadCsv(file)
-                .filter {
-                    parseItems(it.items).contains(material)
-                }
-                .forEach { entry ->
-
-                    try {
-
-                        var date = LocalDate.parse(
-                            "${entry.date} $currentYear",
-                            formatter
-                        )
-
-                        if (date.isBefore(today)) {
-                            date = date.plusYears(1)
-                        }
-
-                        occurrences.add(
-                            MaterialOccurrence(
-                                date,
-                                guildName
-                            )
-                        )
-
-                    } catch (_: Exception) {
+                loadCsv(file)
+                    .filter {
+                        parseItems(it.items).contains(material)
                     }
-                }
-        }
+                    .forEach { entry ->
+
+                        try {
+
+                            var date = LocalDate.parse(
+                                "${entry.date} $currentYear",
+                                formatter
+                            )
+
+                            if (date.isBefore(today)) {
+                                date = date.plusYears(1)
+                            }
+
+                            occurrences.add(
+                                MaterialOccurrence(
+                                    date,
+                                    guildName
+                                )
+                            )
+
+                        } catch (_: Exception) {
+                        }
+                    }
+            }
 
         val nextFive =
             occurrences
                 .sortedBy { it.date }
                 .take(5)
 
-        val text = buildString {
+        val message = buildString {
 
             append(material)
             append("\n\n")
 
             if (nextFive.isEmpty()) {
 
-                append("No upcoming dates found.")
+                append(getString(R.string.ft_no_upcoming))
 
             } else {
 
@@ -569,80 +529,16 @@ class MaterialsFragment : Fragment() {
             }
         }
 
-        android.app.AlertDialog.Builder(requireContext())
-            .setTitle("Next 5 Occurrences")
-            .setMessage(text)
-            .setPositiveButton("OK", null)
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.ft_next_five)
+            .setMessage(message)
+            .setPositiveButton(R.string.ft_ok, null)
             .show()
-    }
-
-    private fun createCalendarMaterialIcon(
-        material: String,
-        entries: List<MaterialEntry>
-    ): View {
-
-        val root = LinearLayout(requireContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(4, 8, 4, 8)
-
-            layoutParams = LinearLayout.LayoutParams(
-                0,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                1f
-            )
-
-            setOnClickListener {
-                showMaterialDates(material, entries)
-            }
-        }
-
-        val image = ImageView(requireContext()).apply {
-
-            val dp = resources.displayMetrics.density
-            val size = (48 * dp).toInt()
-
-            layoutParams = LinearLayout.LayoutParams(
-                size,
-                size
-            )
-
-            scaleType = ImageView.ScaleType.FIT_CENTER
-
-            setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-
-            load(getMaterialIconUrl(material)) {
-
-                crossfade(false)
-
-                allowHardware(false)
-
-                listener(
-                    onSuccess = { _, _ ->
-                        drawable?.setFilterBitmap(false)
-                    }
-                )
-
-                error(android.R.drawable.ic_menu_help)
-            }
-        }
-
-        val text = TextView(requireContext()).apply {
-            this.text = material
-            textSize = 10f
-            gravity = Gravity.CENTER
-            setPadding(0, 4, 0, 0)
-        }
-
-        root.addView(image)
-        root.addView(text)
-
-        return root
     }
 
     private fun showCreditsDialog() {
 
-        val text =
+        val creditsText =
             """
           ────────────────── ⋆⋅★⋅⋆ ──────────────────
 Forecast data provided by:
@@ -692,39 +588,43 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
           ────────────────── ⋆⋅★⋅⋆ ──────────────────
 """.trimIndent()
 
-
-
         val textView = TextView(requireContext()).apply {
-            setPadding(32, 32, 32, 32)
+            setTextAppearance(R.style.TextAppearance_FT_Body)
+            setPadding(dp(24), dp(16), dp(24), dp(8))
             autoLinkMask = android.text.util.Linkify.WEB_URLS
             linksClickable = true
             movementMethod = android.text.method.LinkMovementMethod.getInstance()
             textSize = 14f
-            setText(text)
+            setText(creditsText)
         }
 
+        val scroll = ScrollView(requireContext()).apply {
+            addView(textView)
+        }
 
-        android.app.AlertDialog.Builder(requireContext())
-            .setTitle("Credits")
-            .setView(textView)
-            .setPositiveButton("Close", null)
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.ft_credits)
+            .setView(scroll)
+            .setPositiveButton(R.string.ft_close, null)
             .show()
     }
 
     private fun showGuildSelector() {
 
-        val guilds = getFiles()
+        val guilds = MaterialAvailability.files(requireContext())
 
         val layout = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(32,32,32,32)
+            setPadding(dp(20), dp(8), dp(20), 0)
         }
 
         guilds.forEach { file ->
 
-            val check = android.widget.CheckBox(requireContext()).apply {
+            val check = MaterialCheckBox(requireContext()).apply {
 
                 text = guildDisplayName(file)
+
+                minimumHeight = dp(48)
 
                 isChecked = SelectedGuilds.isEnabled(file)
 
@@ -737,16 +637,18 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
                     )
 
                     rebuildMaterials()
+
+                    (activity as? MainActivity)?.refreshBadges()
                 }
             }
 
             layout.addView(check)
         }
 
-        android.app.AlertDialog.Builder(requireContext())
-            .setTitle("Select Guilds")
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.ft_select_guilds)
             .setView(layout)
-            .setPositiveButton("Close", null)
+            .setPositiveButton(R.string.ft_close, null)
             .show()
     }
 
@@ -759,12 +661,10 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
 
         val layout = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(32, 32, 32, 32)
+            setPadding(dp(20), dp(8), dp(20), 0)
         }
 
-        val search = android.widget.EditText(requireContext()).apply {
-            hint = "Search material..."
-        }
+        val search = searchField(getString(R.string.ft_search_material))
 
         val scroll = ScrollView(requireContext())
 
@@ -782,9 +682,11 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
                 }
                 .forEach { material ->
 
-                    val check = android.widget.CheckBox(requireContext()).apply {
+                    val check = MaterialCheckBox(requireContext()).apply {
 
                         text = material
+
+                        minimumHeight = dp(48)
 
                         isChecked =
                             SelectedMaterials.selected.contains(material)
@@ -800,6 +702,8 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
                             SelectedMaterials.save(requireContext())
                             rebuildMaterials()
                             AuraState.lastUpdateTime = System.currentTimeMillis()
+
+                            (activity as? MainActivity)?.refreshBadges()
                         }
                     }
 
@@ -809,46 +713,95 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
 
         render()
 
-        search.addTextChangedListener(
-            object : android.text.TextWatcher {
-
-                override fun beforeTextChanged(
-                    s: CharSequence?,
-                    start: Int,
-                    count: Int,
-                    after: Int
-                ) {}
-
-                override fun onTextChanged(
-                    s: CharSequence?,
-                    start: Int,
-                    before: Int,
-                    count: Int
-                ) {
-                    render(s.toString())
-                }
-
-                override fun afterTextChanged(
-                    s: android.text.Editable?
-                ) {}
-            }
-        )
+        afterTextChanged(search) { render(it) }
 
         scroll.addView(container)
 
         layout.addView(search)
-        layout.addView(scroll)
 
-        android.app.AlertDialog.Builder(requireContext())
-            .setTitle("Select Materials")
+        layout.addView(
+            scroll,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dialogScrollHeight()
+            )
+        )
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.ft_select_materials)
             .setView(layout)
-            .setPositiveButton("Close", null)
+            .setPositiveButton(R.string.ft_close, null)
             .show()
+    }
+
+    // ------------------------------------------------------------------
+    // material icons
+    // ------------------------------------------------------------------
+
+    private fun loadMaterialIcon(image: ImageView, material: String) {
+
+        image.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+
+        image.load(getMaterialIconUrl(material)) {
+
+            crossfade(false)
+
+            allowHardware(false)
+
+            listener(
+                onSuccess = { _, _ ->
+                    image.drawable?.setFilterBitmap(false)
+                }
+            )
+
+            error(android.R.drawable.ic_menu_help)
+        }
+    }
+
+    private fun createCalendarMaterialIcon(
+        material: String,
+        entries: List<MaterialEntry>
+    ): View {
+
+        val cell = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(2), dp(8), dp(2), dp(8))
+
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1f
+            )
+
+            setOnClickListener {
+                showMaterialDates(material, entries)
+            }
+        }
+
+        val image = ImageView(requireContext()).apply {
+
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
+
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }
+
+        loadMaterialIcon(image, material)
+
+        val label = text(material, R.style.TextAppearance_FT_Muted, 10f).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, dp(4), 0, 0)
+        }
+
+        cell.addView(image)
+        cell.addView(label)
+
+        return cell
     }
 
     private fun createMaterialsGrid(items: List<String>): View {
 
-        val root = LinearLayout(requireContext()).apply {
+        val grid = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
         }
 
@@ -862,13 +815,35 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
                     gravity = Gravity.CENTER_HORIZONTAL
                 }
 
-                root.addView(currentRow)
+                grid.addView(currentRow)
             }
 
             currentRow?.addView(createMaterialIcon(item))
         }
 
-        return root
+        return grid
+    }
+
+    /** Grid inside a card; "Nothing listed" when there is nothing that day. */
+    private fun createGridCard(items: List<String>): View {
+
+        val container = card()
+
+        if (items.isEmpty()) {
+
+            container.addView(
+                text(getString(R.string.ft_nothing_listed), R.style.TextAppearance_FT_Muted).apply {
+                    gravity = Gravity.CENTER
+                    setPadding(0, dp(8), 0, dp(8))
+                }
+            )
+
+        } else {
+
+            container.addView(createMaterialsGrid(items))
+        }
+
+        return container
     }
 
     private fun getSelectedAura(): String {
@@ -881,10 +856,10 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
 
     private fun createMaterialIcon(material: String): View {
 
-        val root = LinearLayout(requireContext()).apply {
+        val cell = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(4, 8, 4, 8)
+            setPadding(dp(2), dp(6), dp(2), dp(6))
 
             layoutParams = LinearLayout.LayoutParams(
                 0,
@@ -893,12 +868,9 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
             )
         }
 
-        val frame = android.widget.FrameLayout(requireContext()).apply {
+        val frame = FrameLayout(requireContext()).apply {
 
-            val dp = resources.displayMetrics.density
-            val size = (76 * dp).toInt()
-
-            layoutParams = LinearLayout.LayoutParams(size, size)
+            layoutParams = LinearLayout.LayoutParams(dp(76), dp(76))
 
             foregroundGravity = Gravity.CENTER
         }
@@ -907,9 +879,9 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
 
             val aura = AuraWebView(requireContext()).apply {
 
-                layoutParams = android.widget.FrameLayout.LayoutParams(
-                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
                 )
 
                 loadAura(getSelectedAura())
@@ -920,49 +892,33 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
 
         val image = ImageView(requireContext()).apply {
 
-            val dp = resources.displayMetrics.density
-            val iconSize = (40 * dp).toInt()
-
-            layoutParams = android.widget.FrameLayout.LayoutParams(
-                iconSize,
-                iconSize,
+            layoutParams = FrameLayout.LayoutParams(
+                dp(40),
+                dp(40),
                 Gravity.CENTER
             )
 
             scaleType = ImageView.ScaleType.FIT_CENTER
-
-            setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-
-            load(getMaterialIconUrl(material)) {
-
-                crossfade(false)
-
-                allowHardware(false)
-
-                listener(
-                    onSuccess = { _, _ ->
-                        drawable?.setFilterBitmap(false)
-                    }
-                )
-
-                error(android.R.drawable.ic_menu_help)
-            }
         }
+
+        loadMaterialIcon(image, material)
 
         frame.addView(image)
 
-        val text = TextView(requireContext()).apply {
-            this.text = material
-            textSize = 10f
+        val label = text(material, R.style.TextAppearance_FT_Muted, 10f).apply {
             gravity = Gravity.CENTER
-            setPadding(0, 4, 0, 0)
+            setPadding(0, dp(2), 0, 0)
         }
 
-        root.addView(frame)
-        root.addView(text)
+        cell.addView(frame)
+        cell.addView(label)
 
-        return root
+        return cell
     }
+
+    // ------------------------------------------------------------------
+    // guild cards
+    // ------------------------------------------------------------------
 
     private fun createGuildCard(
         title: String,
@@ -970,55 +926,67 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
         tomorrow: MaterialEntry?
     ): View {
 
-        val card = LinearLayout(requireContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(32, 32, 32, 32)
+        val container = card()
 
-            background = android.graphics.drawable.GradientDrawable().apply {
-                cornerRadius = 24f
+        container.setPadding(dp(12), dp(14), dp(12), dp(8))
 
-                setColor(
-                    com.google.android.material.color.MaterialColors.getColor(
-                        context,
-                        com.google.android.material.R.attr.colorSurface,
-                        0
-                    )
-                )
+        container.addView(
+            text(title, R.style.TextAppearance_FT_Section).apply {
+                setPadding(dp(2), 0, 0, dp(4))
+            }
+        )
 
-                setStroke(
-                    2,
-                    com.google.android.material.color.MaterialColors.getColor(
-                        context,
-                        com.google.android.material.R.attr.colorOutline,
-                        0
-                    )
-                )
+        container.addView(createMiniSection(title, getString(R.string.ft_today), today))
+
+        container.addView(
+            View(requireContext()).apply {
+                setBackgroundColor(color(R.color.ft_line))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(1)
+                ).apply {
+                    topMargin = dp(4)
+                    bottomMargin = dp(4)
+                }
+            }
+        )
+
+        container.addView(createMiniSection(title, getString(R.string.ft_tomorrow), tomorrow))
+
+        return container
+    }
+
+    private fun createGuildLabel(label: String, iconName: String): View {
+
+        val container = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, dp(4), 0, dp(2))
+        }
+
+        val icon = ImageView(requireContext()).apply {
+
+            layoutParams = LinearLayout.LayoutParams(dp(26), dp(26))
+
+            val asset = try {
+                requireContext().assets.open("$iconName.png")
+            } catch (e: Exception) {
+                null
             }
 
-            val params = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-
-            params.setMargins(0, 0, 0, 32)
-
-            layoutParams = params
+            if (asset != null) {
+                setImageDrawable(android.graphics.drawable.Drawable.createFromStream(asset, null))
+            }
         }
 
-        val titleText = TextView(requireContext()).apply {
-            text = title
-            textSize = 20f
-            gravity = Gravity.CENTER_HORIZONTAL
-            setTypeface(null, Typeface.BOLD)
-            setPadding(0, 0, 0, 16)
+        val labelView = text(label, R.style.TextAppearance_FT_Label, 14f).apply {
+            setPadding(dp(6), 0, 0, 0)
         }
 
-        card.addView(titleText)
+        container.addView(icon)
+        container.addView(labelView)
 
-        card.addView(createMiniSection(title, "TODAY", today))
-        card.addView(createMiniSection(title, "TOMORROW", tomorrow))
-
-        return card
+        return container
     }
 
     private fun createMiniSection(
@@ -1027,23 +995,22 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
         entry: MaterialEntry?
     ): View {
 
-        val root = LinearLayout(requireContext()).apply {
+        val section = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 16, 0, 16)
+            setPadding(0, dp(8), 0, dp(8))
         }
 
-        val title = TextView(requireContext()).apply {
-            text = label
-            textSize = 16f
-            setTypeface(null, Typeface.BOLD)
-        }
-
-        root.addView(title)
+        section.addView(
+            text(label, R.style.TextAppearance_FT_Overline).apply {
+                setPadding(dp(2), 0, 0, dp(4))
+            }
+        )
 
         val items = parseItems(entry?.items ?: "")
 
-        Log.d("TITLES", guildTitle)
-        if (guildTitle.contains("Anguish 2.0", ignoreCase = true)) {
+        // Anguish 2.0 lists 8 items: 2 per proof type. If the day has fewer
+        // (missing entry) fall back to the plain grid instead of crashing.
+        if (guildTitle.contains("Anguish 2.0", ignoreCase = true) && items.size >= 8) {
 
             val groups = listOf(
                 Triple("Agony", "proof_agony", items.subList(0, 2)),
@@ -1051,11 +1018,6 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
                 Triple("Melancholy", "proof_melancholy", items.subList(4, 6)),
                 Triple("Torment", "proof_torment", items.subList(6, 8))
             )
-
-            var leftHeader: View? = null
-            var rightHeader: View? = null
-            var leftRow: LinearLayout? = null
-            var rightRow: LinearLayout? = null
 
             groups.chunked(2).forEach { pair ->
 
@@ -1067,7 +1029,7 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
                     )
                 }
 
-                pair.forEachIndexed { index, (name, icon, groupItems) ->
+                pair.forEach { (name, icon, groupItems) ->
 
                     val column = LinearLayout(requireContext()).apply {
                         orientation = LinearLayout.VERTICAL
@@ -1080,23 +1042,23 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
                     containerRow.addView(column)
                 }
 
-                root.addView(containerRow)
+                section.addView(containerRow)
             }
+
+        } else if (items.isEmpty()) {
+
+            section.addView(
+                text(getString(R.string.ft_nothing_listed), R.style.TextAppearance_FT_Muted).apply {
+                    setPadding(dp(2), 0, 0, dp(4))
+                }
+            )
 
         } else {
 
-            root.addView(createMaterialsGrid(items))
+            section.addView(createMaterialsGrid(items))
         }
 
-        return root
-    }
-
-    private fun parseItems(raw: String): List<String> {
-
-        return raw
-            .split(",")
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
+        return section
     }
 
     private fun getMaterialIconUrl(material: String): String {
@@ -1122,46 +1084,5 @@ https://docs.google.com/spreadsheets/d/1gWTEeQnFlNePLTOLCbrzyMWljJjR01L84z2tpeaO
                 .replace(" ", "_")
 
         return "https://playorna.com/static/img/materials/$normalized.png"
-    }
-
-    private fun loadCsv(fileName: String): List<MaterialEntry> {
-
-        val list = mutableListOf<MaterialEntry>()
-
-        val input = requireContext().assets.open(fileName)
-
-        val reader = BufferedReader(InputStreamReader(input))
-
-        reader.readLine()
-
-        reader.forEachLine { line ->
-
-            val parts = line.split(",", limit = 3)
-
-            if (parts.size >= 3) {
-
-                list.add(
-                    MaterialEntry(
-                        parts[0],
-                        parts[1],
-                        parts[2].replace("\"", "")
-                    )
-                )
-            }
-        }
-
-        return list
-    }
-
-    private fun getDateString(offset: Long): String {
-
-        val date = LocalDate.now().plusDays(offset)
-
-        val month = date.month.getDisplayName(
-            TextStyle.FULL,
-            Locale.ENGLISH
-        )
-
-        return "$month ${date.dayOfMonth}"
     }
 }

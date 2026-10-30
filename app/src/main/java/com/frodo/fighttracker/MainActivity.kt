@@ -1,44 +1,52 @@
-//12.08.2026 14:17 - ostatnia zmiana przed ruszaniem guzika
 package com.frodo.fighttracker
 
+import android.Manifest
 import android.app.Activity
-import android.content.BroadcastReceiver
+import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
+import android.util.Log
+import android.widget.TimePicker
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import com.frodo.fighttracker.databinding.ActivityMainBinding
-import android.widget.TextView
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import android.provider.Settings
-import android.net.Uri
-import coil.load
-import coil.request.ImageRequest
-import android.Manifest
-import android.content.pm.PackageManager
-import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import android.widget.TimePicker
-import android.app.AlarmManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-
-private var isFloatingEnabled = false
-private lateinit var codexFragment: WebFragment
+import androidx.viewpager2.adapter.FragmentStateAdapter
+import androidx.viewpager2.widget.ViewPager2
+import coil.load
+import com.frodo.fighttracker.databinding.ActivityMainBinding
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import android.content.res.Configuration
 
 object SettingsStore {
+
+    private const val KEY_UI_SCALE = "ui_scale"
+
+    /** Interface scale in percent: 60..140, step 20, default 100. */
+    fun getUiScale(context: Context): Int {
+        val v = context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+            .getInt(KEY_UI_SCALE, 100)
+        return v.coerceIn(60, 140)
+    }
+
+    fun setUiScale(context: Context, value: Int) {
+        context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(KEY_UI_SCALE, value.coerceIn(60, 140))
+            .apply()
+    }
 
     private const val KEY_ASSESS_DATABASE_URL =
         "assess_database_url"
@@ -87,6 +95,20 @@ object SettingsStore {
 
     private const val KEY_HIGH_QUALITY_OCR = "high_quality_ocr"
     private const val KEY_LEGACY_OCR = "legacy_ocr"
+    private const val KEY_EXPERIMENTAL_OCR = "experimental_ocr"
+
+    /** PaddleOCR reward scanner. Overrides the legacy OCR setting. */
+    fun getExperimentalOcr(context: Context): Boolean {
+        return context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+            .getBoolean(KEY_EXPERIMENTAL_OCR, false)
+    }
+
+    fun setExperimentalOcr(context: Context, value: Boolean) {
+        context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_EXPERIMENTAL_OCR, value)
+            .apply()
+    }
 
     fun getLegacyOcr(context: Context): Boolean {
         return context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
@@ -192,6 +214,7 @@ object SettingsStore {
             .apply()
     }
 
+    /** "AUSSIE" or "YACO". Now chosen with the segmented control in the Codex tab. */
     fun getCodexType(context: Context): String {
         return context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
             .getString(KEY_CODEX, "AUSSIE") ?: "AUSSIE"
@@ -213,6 +236,15 @@ class MainActivity : AppCompatActivity() {
 
         const val ACTION_TOGGLE_ITEM_ASSESSMENT =
             "ACTION_TOGGLE_ITEM_ASSESSMENT"
+
+        /** Page order == bottom navigation order == "open_tab" index. */
+        private val PAGE_IDS = intArrayOf(
+            R.id.nav_tracker,
+            R.id.nav_materials,
+            R.id.nav_codex,
+            R.id.nav_gleaming,
+            R.id.nav_guides
+        )
     }
 
 
@@ -314,8 +346,9 @@ class MainActivity : AppCompatActivity() {
 
         setIntent(intent)
 
+        // notifications ask for a tab by index (1 = Materials)
         val openTab = intent.getIntExtra("open_tab", -1)
-        if (openTab >= 0) {
+        if (openTab in PAGE_IDS.indices) {
             binding.viewPager.setCurrentItem(openTab, false)
         }
 
@@ -377,8 +410,26 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    override fun attachBaseContext(newBase: Context) {
+
+        val scale = SettingsStore.getUiScale(newBase)
+
+        if (scale == 100) {
+            super.attachBaseContext(newBase)
+            return
+        }
+
+        // dp, sp and WebView content all follow densityDpi
+        val config = Configuration(newBase.resources.configuration)
+        config.densityDpi = (config.densityDpi * scale / 100f).toInt()
+
+        super.attachBaseContext(newBase.createConfigurationContext(config))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // transient status bar (swipe from the top edge), as before
         val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
         windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         windowInsetsController.hide(WindowInsetsCompat.Type.statusBars())
@@ -401,15 +452,21 @@ class MainActivity : AppCompatActivity() {
 
 
         MaterialAlarmScheduler.schedule(this)
+
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
         binding = ActivityMainBinding.inflate(layoutInflater)
 
         setContentView(binding.root)
+
+        setupInsets()
+
         ItemDatabaseManager.initialize(this)
 
         ItemAssessmentPipeline
             .ItemAssessmentManager
             .initialize(this)
-        updateFloatingButton()
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
 
             if (
@@ -443,88 +500,10 @@ class MainActivity : AppCompatActivity() {
                 MEDIA_PROJECTION_SERVICE
             ) as MediaProjectionManager
 
+        setupPagerAndNavigation()
 
-        val towerFragment =
-            WebFragment.newInstance("https://codex.fqegg.top/#/tower")
-
-        val monumentsFragment =
-            WebFragment.newInstance("https://floorchart.top/")
-
-        codexFragment =
-            WebFragment.newInstance(getCodexUrl())
-
-
-        val fragments = listOf(
-            TrackerFragment(),
-            MaterialsFragment(),
-            codexFragment,
-            monumentsFragment,
-            towerFragment
-        )
-
-        val titles = listOf(
-            "Tracker",
-            "Materials",
-            "Codex",
-            "Monuments",
-            "Towers"
-        )
-        binding.settingsFab.setOnClickListener {
-            showSettingsDialog()
-        }
-
-        binding.fabFloatingToggle.setOnClickListener {
-
-            if (!isFloatingEnabled) {
-
-                if (!Settings.canDrawOverlays(this)) {
-
-                    checkOverlayPermission()
-                    return@setOnClickListener
-                }
-
-                startFloatingService()
-
-                binding.fabFloatingToggle.setImageResource(
-                    android.R.drawable.ic_media_pause
-                )
-
-                isFloatingEnabled = true
-
-            } else {
-
-                stopFloatingService()
-
-                binding.fabFloatingToggle.setImageResource(
-                    android.R.drawable.ic_media_play
-                )
-
-                isFloatingEnabled = false
-            }
-        }
-
-        binding.viewPager.adapter =
-            object : androidx.viewpager2.adapter.FragmentStateAdapter(this) {
-
-                override fun getItemCount() = fragments.size
-
-                override fun createFragment(position: Int) =
-                    fragments[position]
-            }
-        binding.viewPager.isUserInputEnabled = true
-        binding.viewPager.offscreenPageLimit = 1
-
-        com.google.android.material.tabs.TabLayoutMediator(
-            binding.tabLayout,
-            binding.viewPager
-        ) { tab, position ->
-
-            tab.text = titles[position]
-
-        }.attach()
-        renderHistory()
         val openTab = intent.getIntExtra("open_tab", -1)
-        if (openTab >= 0) {
+        if (openTab in PAGE_IDS.indices) {
             binding.viewPager.post {
                 binding.viewPager.setCurrentItem(openTab, false)
             }
@@ -537,15 +516,139 @@ class MainActivity : AppCompatActivity() {
                 handleIntentAction(intent)
             }
         }
-
-//        val pipeline =
-//            ItemAssessmentPipeline(
-//                this@MainActivity
-//            )
-
-//        pipeline.processAllExamples()
     }
 
+    override fun onResume() {
+        super.onResume()
+        refreshBadges()
+    }
+
+    // ------------------------------------------------------------------
+    // layout: insets, pager, bottom navigation
+    // ------------------------------------------------------------------
+
+    /**
+     * - top: only the display cutout (the status bar is hidden / transient)
+     * - bottom: the navigation-bar inset goes on the nav container, so the
+     *   bar's background extends under the system navigation
+     * - keyboard: the page shrinks and the bottom bar steps aside
+     */
+    private fun setupInsets() {
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
+
+            val cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
+            val nav = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+
+            val keyboardUp = ime.bottom > 0
+
+            binding.root.setPadding(
+                cutout.left,
+                cutout.top,
+                cutout.right,
+                if (keyboardUp) ime.bottom else 0
+            )
+
+            binding.navContainer.setPadding(
+                0,
+                0,
+                0,
+                if (keyboardUp) 0 else nav.bottom
+            )
+
+            binding.navContainer.visibility =
+                if (keyboardUp) android.view.View.GONE else android.view.View.VISIBLE
+
+            insets
+        }
+    }
+
+    private fun setupPagerAndNavigation() {
+
+        binding.viewPager.adapter =
+            object : FragmentStateAdapter(this) {
+
+                override fun getItemCount() = PAGE_IDS.size
+
+                override fun createFragment(position: Int) =
+                    when (position) {
+                        0 -> TrackerFragment()
+                        1 -> MaterialsFragment()
+                        2 -> CodexFragment()
+                        3 -> GleamingFragment()
+                        else -> GuidesFragment()
+                    }
+            }
+
+        // navigation is done with the bottom bar only (no swiping, so the
+        // web pages can scroll sideways without changing tabs)
+        binding.viewPager.isUserInputEnabled = false
+
+        // keep every page alive: web pages keep their state when switching tabs
+        binding.viewPager.offscreenPageLimit = PAGE_IDS.size - 1
+
+        binding.bottomNav.setOnItemSelectedListener { item ->
+
+            val index = PAGE_IDS.indexOf(item.itemId)
+
+            if (index >= 0) {
+                binding.viewPager.setCurrentItem(index, false)
+            }
+
+            index >= 0
+        }
+
+        binding.viewPager.registerOnPageChangeCallback(
+            object : ViewPager2.OnPageChangeCallback() {
+
+                override fun onPageSelected(position: Int) {
+
+                    binding.bottomNav.selectedItemId = PAGE_IDS[position]
+
+                    // the run card is expanded each time the Tracker tab is shown
+                    if (position == 0) {
+                        supportFragmentManager.fragments
+                            .filterIsInstance<TrackerFragment>()
+                            .firstOrNull()
+                            ?.onTabSelected()
+                    }
+                }
+            }
+        )
+    }
+
+    /**
+     * Small accent dot on "Materials" when one of the SELECTED materials
+     * is available today.
+     */
+    fun refreshBadges() {
+
+        if (!::binding.isInitialized) return
+
+        val available = try {
+            MaterialAvailability.hasSelectedMaterialToday(this)
+        } catch (e: Exception) {
+            false
+        }
+
+        if (available) {
+
+            val badge = binding.bottomNav.getOrCreateBadge(R.id.nav_materials)
+
+            badge.clearNumber()
+            badge.backgroundColor = ContextCompat.getColor(this, R.color.ft_accent)
+            badge.isVisible = true
+
+        } else {
+
+            binding.bottomNav.removeBadge(R.id.nav_materials)
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // floating overlay
+    // ------------------------------------------------------------------
 
     fun stopFloatingService() {
 
@@ -557,77 +660,30 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    fun getCodexUrl(): String {
-        return if (SettingsStore.getCodexType(this) == "AUSSIE") {
-            "https://www.aussiescodex.com/orna-items"
-        } else {
-            "https://codex.fqegg.top/#/"
-        }
-    }
-
-    private fun updateFloatingButton() {
+    /** Used by the "Overlay" pill in the Tracker header. */
+    fun toggleFloatingService() {
 
         if (FloatingTrackerService.isRunning) {
 
-            binding.fabFloatingToggle.setImageResource(
-                android.R.drawable.ic_media_pause
-            )
+            stopFloatingService()
 
         } else {
 
-            binding.fabFloatingToggle.setImageResource(
-                android.R.drawable.ic_media_play
-            )
+            if (!Settings.canDrawOverlays(this)) {
+
+                checkOverlayPermission()
+                return
+            }
+
+            startFloatingService()
         }
     }
-    private fun renderHistory() {
 
+    // ------------------------------------------------------------------
+    // settings
+    // ------------------------------------------------------------------
 
-
-        val runs = RunStorage.loadRuns(this)
-
-        for (run in runs) {
-
-            val tv = TextView(this)
-
-            val gold =
-                run.gold.toString()
-                    .reversed()
-                    .chunked(3)
-                    .joinToString(" ")
-                    .reversed()
-
-            val orns =
-                run.orns.toString()
-                    .reversed()
-                    .chunked(3)
-                    .joinToString(" ")
-                    .reversed()
-
-            val exp =
-                run.exp.toString()
-                    .reversed()
-                    .chunked(3)
-                    .joinToString(" ")
-                    .reversed()
-
-            tv.text =
-                "${run.date}\n" +
-                        "Time: ${run.duration}\n" +
-                        "Gold: $gold\n" +
-                        "Orns: $orns\n" +
-                        "EXP: $exp"
-
-            tv.textSize = 16f
-
-            tv.setPadding(0, 0, 0, 40)
-
-
-        }
-    }
-    private fun showSettingsDialog() {
-
-
+    fun showSettingsDialog() {
 
         val dialogView = layoutInflater.inflate(R.layout.dialog_settings, null)
 
@@ -663,6 +719,10 @@ class MainActivity : AppCompatActivity() {
             dialogView.findViewById<android.widget.CheckBox>(
                 R.id.legacyOcrCheck
             )
+        val experimentalOcrCheck =
+            dialogView.findViewById<android.widget.CheckBox>(
+                R.id.experimentalOcrCheck
+            )
         val shareLogsButton =
             dialogView.findViewById<android.widget.Button>(
                 R.id.shareLogsButton
@@ -693,7 +753,7 @@ class MainActivity : AppCompatActivity() {
                 startActivity(
                     Intent.createChooser(
                         share,
-                        "Share Fight Tracker Logs"
+                        getString(R.string.ft_share_logs_chooser)
                     )
                 )
             }
@@ -704,18 +764,42 @@ class MainActivity : AppCompatActivity() {
         legacyOcrCheck.isChecked =
             SettingsStore.getLegacyOcr(this)
 
+        experimentalOcrCheck.isChecked =
+            SettingsStore.getExperimentalOcr(this)
+
+        // experimental mode overrides legacy OCR -> grey it out while it is on
+        legacyOcrCheck.isEnabled = !experimentalOcrCheck.isChecked
+
+        experimentalOcrCheck.setOnCheckedChangeListener { _, checked ->
+            legacyOcrCheck.isEnabled = !checked
+        }
+
         notifyCheck.isChecked =
             SettingsStore.getMaterialNotifications(this)
 
         val auraSpinner = dialogView.findViewById<android.widget.Spinner>(R.id.auraSpinner)
         val auraPreview = dialogView.findViewById<android.widget.ImageView>(R.id.auraPreview)
 
-        val auraFiles = assets.list("aura")
-            ?.filter { it.endsWith(".webp") }
-            ?: emptyList()
-
         val scanInput = dialogView.findViewById<android.widget.EditText>(R.id.scanIntervalInput)
-        val codexGroup = dialogView.findViewById<android.widget.RadioGroup>(R.id.codexGroup)
+
+        val uiScaleSlider =
+            dialogView.findViewById<com.google.android.material.slider.Slider>(R.id.uiScaleSlider)
+        val uiScaleLabel =
+            dialogView.findViewById<android.widget.TextView>(R.id.uiScaleLabel)
+
+        val currentUiScale = SettingsStore.getUiScale(this)
+
+        fun updateUiScaleLabel(v: Int) {
+            uiScaleLabel.text =
+                getString(R.string.ft_ui_scale) + ": " + getString(R.string.ft_ui_scale_value, v)
+        }
+
+        uiScaleSlider.value = currentUiScale.toFloat()
+        updateUiScaleLabel(currentUiScale)
+
+        uiScaleSlider.addOnChangeListener { _, value, _ ->
+            updateUiScaleLabel(value.toInt())
+        }
 
         val assessDatabaseUrlInput =
             dialogView.findViewById<android.widget.EditText>(
@@ -728,12 +812,8 @@ class MainActivity : AppCompatActivity() {
 
         scanInput.setText(SettingsStore.getScanInterval(this).toString())
 
-        val current = SettingsStore.getCodexType(this)
-        if (current == "AUSSIE") {
-            codexGroup.check(R.id.radioAussie)
-        } else {
-            codexGroup.check(R.id.radioYaco)
-        }
+        // (the Codex source radio group moved to the Codex tab)
+
         val anguishGroup = dialogView.findViewById<android.widget.RadioGroup>(R.id.anguishGroup)
 
 
@@ -798,10 +878,10 @@ class MainActivity : AppCompatActivity() {
 
         // save settings
 
-        android.app.AlertDialog.Builder(this)
-            .setTitle("Settings")
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.ft_settings_title)
             .setView(dialogView)
-            .setPositiveButton("Save") { _, _ ->
+            .setPositiveButton(R.string.ft_save) { _, _ ->
 
                 val anguishVersion = when (anguishGroup.checkedRadioButtonId) {
                     R.id.radioAnguish2 -> "2.0"
@@ -855,28 +935,36 @@ class MainActivity : AppCompatActivity() {
                     this,
                     legacyOcrCheck.isChecked
                 )
-                val oldCodex = SettingsStore.getCodexType(this)
+                SettingsStore.setExperimentalOcr(
+                    this,
+                    experimentalOcrCheck.isChecked
+                )
 
-                val selectedCodex = when (codexGroup.checkedRadioButtonId) {
-                    R.id.radioAussie -> "AUSSIE"
-                    else -> "YACO"
+                val selectedAura = auraSpinner.selectedItem as? String
+                if (selectedAura != null) {
+                    prefs.edit().putString("selected_aura", selectedAura).apply()
                 }
-
-                SettingsStore.setCodexType(this, selectedCodex)
-
-                if (oldCodex != selectedCodex) {
-                    codexFragment.reloadUrl(getCodexUrl())
-                }
-
-                val selectedAura = auraSpinner.selectedItem as String
-                prefs.edit().putString("selected_aura", selectedAura).apply()
                 AuraNotifier.refresh?.invoke()
 
                 AuraState.lastUpdateTime = System.currentTimeMillis()
                 MaterialAlarmScheduler.schedule(this)
+
+                // the Anguish version changes the proofs and the materials list
+                supportFragmentManager.fragments
+                    .filterIsInstance<TrackerFragment>()
+                    .firstOrNull()
+                    ?.refreshProofViews()
+
+                refreshBadges()
+                val newUiScale = uiScaleSlider.value.toInt()
+
+                if (newUiScale != currentUiScale) {
+                    SettingsStore.setUiScale(this, newUiScale)
+                    recreate()
+                }
             }
 
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(R.string.ft_cancel, null)
             .show()
     }
 

@@ -1,54 +1,82 @@
 package com.frodo.fighttracker
 
+import android.annotation.SuppressLint
+import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.Editable
+import android.text.TextWatcher
+import android.transition.AutoTransition
+import android.transition.TransitionManager
+import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import androidx.fragment.app.Fragment
-import com.frodo.fighttracker.databinding.FragmentTrackerBinding
-import android.content.Context
-import android.content.Intent
-import android.util.Log
-import android.view.Gravity
-import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.TextView
-import android.view.MotionEvent
 import android.widget.Toast
-import coil.load
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.Fragment
+import com.frodo.fighttracker.databinding.DialogRenameBinding
+import com.frodo.fighttracker.databinding.FragmentTrackerBinding
+import com.google.android.material.chip.Chip
+import com.google.android.material.checkbox.MaterialCheckBox
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.materialswitch.MaterialSwitch
 
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 var recording = 0
 
 class TrackerFragment : Fragment() {
 
     private var _binding: FragmentTrackerBinding? = null
     private val binding get() = _binding!!
+
     private val stopHoldHandler = Handler(Looper.getMainLooper())
     private var stopHoldRunnable: Runnable? = null
     private var isHolding = false
 
-    /** proof id -> counter TextView currently shown under the stats */
+    /** 500ms refresh of timer / stats / overlay pill (runs only while resumed). */
+    private val ui = Handler(Looper.getMainLooper())
+
+    private val tick = object : Runnable {
+        override fun run() {
+            if (_binding == null) return
+            updateLive()
+            ui.postDelayed(this, 500)
+        }
+    }
+
+    /** Current run card: expanded by default every time the tab is shown. */
+    private var expanded = true
+
+    /** proof id -> counter TextView currently shown in the run card */
     private val proofCountViews = mutableMapOf<String, TextView>()
 
-    private fun fmt(value: Long): String {
-        return value.toString()
-            .reversed()
-            .chunked(3)
-            .joinToString(" ")
-            .reversed()
+    // ---- run history state ----
+
+    private lateinit var adapter: RunHistoryAdapter
+
+    private var allRuns: List<RunRecord> = emptyList()
+
+    /** null = "All" */
+    private var typeFilter: RunType? = null
+
+    private var query = ""
+
+    private enum class Sort(val labelRes: Int) {
+        NEWEST(R.string.ft_sort_newest),
+        MOST_GOLD(R.string.ft_sort_gold),
+        ORNS_PER_MIN(R.string.ft_sort_orns_min)
     }
 
-    override fun onResume() {
-        super.onResume()
-        // Anguish version could have been changed in settings
-        refreshProofViews()
-        renderHistory()
-    }
+    private var sort = Sort.NEWEST
+
+    // ------------------------------------------------------------------
+    // lifecycle
+    // ------------------------------------------------------------------
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -58,48 +86,113 @@ class TrackerFragment : Fragment() {
 
         _binding = FragmentTrackerBinding.inflate(inflater, container, false)
 
-        val handler = Handler(Looper.getMainLooper())
+        val b = binding
 
-        handler.post(object : Runnable {
-            override fun run() {
+        setupStatCells()
+        setupRunCard()
+        setupHistory()
 
-                // view destroyed -> stop this loop
-                val b = _binding ?: return
+        b.settingsButton.setOnClickListener {
+            (activity as? MainActivity)?.showSettingsDialog()
+        }
 
-                b.goldText.text = "gold: ${fmt(FightState.gold)}"
+        b.overlayToggle.setOnClickListener {
+            (activity as? MainActivity)?.toggleFloatingService()
+        }
 
-                b.ornsText.text = "orns: ${fmt(FightState.orns)}"
-
-                b.expText.text = "exp: ${fmt(FightState.exp)}"
-
-                b.shardsText.text = "tower shards: ${fmt(FightState.shards)}"
-
-                for ((id, view) in proofCountViews) {
-                    view.text = fmt(FightState.proofs[id] ?: 0L)
-                }
-
-                handler.postDelayed(this, 500)
-
-            }
-
-        })
-
-        binding.proofModeButton.setOnClickListener {
+        b.trackingRow.setOnClickListener {
             showProofModeDialog()
         }
 
         refreshProofViews()
+        applyExpanded(animate = false)
 
-        binding.startButton.setOnClickListener {
+        return b.root
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        // Anguish version could have been changed in settings
+        refreshProofViews()
+        reloadHistory()
+
+        ui.removeCallbacks(tick)
+        ui.post(tick)
+    }
+
+    override fun onPause() {
+        ui.removeCallbacks(tick)
+        super.onPause()
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        ui.removeCallbacks(tick)
+        stopHoldRunnable?.let { stopHoldHandler.removeCallbacks(it) }
+        proofCountViews.clear()
+        _binding = null
+    }
+
+    /** Called by MainActivity when the Tracker tab becomes the selected page. */
+    fun onTabSelected() {
+        expanded = true
+        if (_binding != null) applyExpanded(animate = false)
+    }
+
+    // ------------------------------------------------------------------
+    // setup
+    // ------------------------------------------------------------------
+
+    private fun setupStatCells() {
+
+        val b = binding
+
+        fun cell(
+            c: com.frodo.fighttracker.databinding.ViewStatCellBinding,
+            label: Int,
+            color: Int
+        ) {
+            c.statLabel.setText(label)
+            c.statValue.setTextColor(ContextCompat.getColor(requireContext(), color))
+        }
+
+        cell(b.statGold, R.string.ft_label_gold, R.color.ft_gold)
+        cell(b.statOrns, R.string.ft_label_orns, R.color.ft_orns)
+        cell(b.statExp, R.string.ft_label_exp, R.color.ft_exp)
+        cell(b.statShards, R.string.ft_label_shards, R.color.ft_shards)
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupRunCard() {
+
+        val b = binding
+
+        // whole card toggles (the buttons / tracking row consume their own taps)
+        b.runCard.setOnClickListener {
+            expanded = !expanded
+            applyExpanded(animate = true)
+        }
+
+        b.startButton.setOnClickListener {
             FightState.startTime = System.currentTimeMillis()
             FightState.ornsConfirmationThreshold = 3_000_000L
             (activity as MainActivity).startCapture()
             recording = 1
         }
 
+        b.undoButton.setOnClickListener {
+            if (!FightTrackerService.undoLast()) {
+                Toast.makeText(
+                    requireContext(),
+                    R.string.ft_nothing_to_undo,
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
 
-
-        binding.stopButton.setOnTouchListener { v, event ->
+        // tap = stop, hold for 2s = toggle the OCR debug overlay (unchanged behaviour)
+        b.stopButton.setOnTouchListener { _, event ->
 
             when (event.action) {
 
@@ -115,7 +208,7 @@ class TrackerFragment : Fragment() {
 
                             Toast.makeText(
                                 requireContext(),
-                                if (enabled) "debug enabled" else "debug disabled",
+                                if (enabled) R.string.ft_debug_on else R.string.ft_debug_off,
                                 Toast.LENGTH_SHORT
                             ).show()
 
@@ -149,10 +242,11 @@ class TrackerFragment : Fragment() {
 
                         isHolding = false
 
-                        if (recording == 1) {
+                        if (recording == 1 || TrackingController.isRunning) {
                             recording = 0
                             (activity as MainActivity).stopTracking()
-                            renderHistory()
+                            reloadHistory()
+                            updateLive()
                         }
 
                     } else {
@@ -176,20 +270,284 @@ class TrackerFragment : Fragment() {
                 else -> true
             }
         }
-
-        return binding.root
     }
 
-    override fun onDestroyView() {
-        super.onDestroyView()
-        proofCountViews.clear()
-        _binding = null
+    private fun setupHistory() {
+
+        val b = binding
+
+        adapter = RunHistoryAdapter(
+            onRename = { showRenameDialog(it) },
+            onDelete = { confirmDelete(it) }
+        )
+
+        b.historyList.adapter = adapter
+        b.historyList.itemAnimator = null
+
+        b.searchInput.addTextChangedListener(object : TextWatcher {
+
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+
+            override fun afterTextChanged(s: Editable?) {
+                query = s?.toString().orEmpty().trim()
+                applyFilters()
+            }
+        })
+
+        b.filterGroup.setOnCheckedStateChangeListener { _, ids ->
+
+            typeFilter = when (ids.firstOrNull()) {
+                R.id.chipAnguish -> RunType.ANGUISH
+                R.id.chipTowers -> RunType.TOWERS
+                R.id.chipCoral -> RunType.CORAL
+                R.id.chipGuard -> RunType.GUARD
+                R.id.chipRemembrance -> RunType.REMEMBRANCE
+                else -> null
+            }
+
+            applyFilters()
+        }
+
+        b.sortButton.text = getString(R.string.ft_sort_format, getString(sort.labelRes))
+
+        b.sortButton.setOnClickListener { anchor ->
+
+            val menu = PopupMenu(requireContext(), anchor)
+
+            Sort.values().forEachIndexed { index, s ->
+                menu.menu.add(0, index, index, s.labelRes)
+            }
+
+            menu.setOnMenuItemClickListener { item ->
+                sort = Sort.values()[item.itemId]
+                binding.sortButton.text =
+                    getString(R.string.ft_sort_format, getString(sort.labelRes))
+                applyFilters()
+                true
+            }
+
+            menu.show()
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // current run card
+    // ------------------------------------------------------------------
+
+    private fun applyExpanded(animate: Boolean) {
+
+        val b = _binding ?: return
+
+        if (animate) {
+            TransitionManager.beginDelayedTransition(
+                b.runCard,
+                AutoTransition().setDuration(180)
+            )
+        }
+
+        b.runDetails.visibility = if (expanded) View.VISIBLE else View.GONE
+
+        val target = if (expanded) 180f else 0f
+
+        if (animate) {
+            b.runChevron.animate().rotation(target).setDuration(180).start()
+        } else {
+            b.runChevron.animate().cancel()
+            b.runChevron.rotation = target
+        }
+    }
+
+    /** Runs every 500ms while the tab is visible. */
+    private fun updateLive() {
+
+        val b = _binding ?: return
+        val ctx = context ?: return
+
+        // overlay pill
+        b.overlayDot.setBackgroundResource(
+            if (FloatingTrackerService.isRunning) R.drawable.bg_dot else R.drawable.bg_dot_off
+        )
+
+        val running = TrackingController.isRunning
+
+        // header state
+        b.statusDot.setBackgroundResource(if (running) R.drawable.bg_dot else R.drawable.bg_dot_off)
+        b.statusText.setText(if (running) R.string.ft_tracking else R.string.ft_idle)
+        b.statusText.setTextColor(
+            ContextCompat.getColor(ctx, if (running) R.color.ft_ok else R.color.ft_muted)
+        )
+
+        b.startButton.visibility = if (running) View.GONE else View.VISIBLE
+        b.stopButton.visibility = if (running) View.VISIBLE else View.GONE
+        b.undoButton.visibility = if (running) View.VISIBLE else View.GONE
+        b.compactRates.visibility = if (running) View.VISIBLE else View.GONE
+
+        val elapsedMs =
+            if (running && FightState.startTime > 0L)
+                System.currentTimeMillis() - FightState.startTime
+            else 0L
+
+        b.timerText.text = UiKit.timer(elapsedMs)
+
+        // per-minute = value / minutes since the run started
+        // (needs at least 10s of data, otherwise the number is just noise)
+        val minutes = elapsedMs / 60_000.0
+
+        fun perMinute(value: Long): Double? =
+            if (running && minutes >= 10.0 / 60.0) value / minutes else null
+
+        fun rateText(value: Long): String {
+            val r = perMinute(value) ?: return ctx.getString(R.string.ft_dash)
+            return ctx.getString(R.string.ft_per_min, UiKit.compact(r))
+        }
+
+        fun shortRate(value: Long): String {
+            val r = perMinute(value) ?: return ctx.getString(R.string.ft_dash)
+            return ctx.getString(R.string.ft_per_min_short, UiKit.compact(r))
+        }
+
+        val gold = FightState.gold
+        val orns = FightState.orns
+        val exp = FightState.exp
+        val shards = FightState.shards
+
+        b.statGold.statValue.text = UiKit.fmt(gold)
+        b.statGold.statRate.text = rateText(gold)
+
+        b.statOrns.statValue.text = UiKit.fmt(orns)
+        b.statOrns.statRate.text = rateText(orns)
+
+        b.statExp.statValue.text = UiKit.fmt(exp)
+        b.statExp.statRate.text = rateText(exp)
+
+        b.statShards.statValue.text = UiKit.fmt(shards)
+        b.statShards.statRate.text = rateText(shards)
+
+        b.compactGold.text = shortRate(gold)
+        b.compactOrns.text = shortRate(orns)
+
+        for ((id, view) in proofCountViews) {
+            view.text = UiKit.fmt(FightState.proofs[id] ?: 0L)
+        }
+    }
+
+    /** "TRACKING: Orns · EXP · Gold · Anguish 2.0 · King's guard" */
+    private fun trackingSummary(): String {
+
+        val ctx = requireContext()
+
+        val parts = mutableListOf<String>()
+
+        val currencies = CurrencyTracking.getTracked(ctx)
+
+        for (c in CurrencyTracking.Currency.values()) {
+            if (c in currencies) parts.add(c.label)
+        }
+
+        val modes = ProofTracking.getModes(ctx)
+
+        for (mode in ProofTracking.Mode.values()) {
+
+            if (mode !in modes) continue
+
+            parts.add(
+                when (mode) {
+                    ProofTracking.Mode.ANGUISH ->
+                        getString(
+                            R.string.ft_anguish_version_label,
+                            SettingsStore.getAnguishVersion(ctx)
+                        )
+
+                    ProofTracking.Mode.KINGS_GUARD -> getString(R.string.ft_kings_guard)
+
+                    ProofTracking.Mode.SKELETON_KEY -> getString(R.string.ft_skeleton_key)
+                }
+            )
+        }
+
+        val text =
+            if (parts.isEmpty()) getString(R.string.ft_tracking_nothing)
+            else parts.joinToString(" · ")
+
+        return getString(R.string.ft_tracking_summary, text)
     }
 
     /**
-     * Dialog: what is tracked (shown in this tab) and what is
-     * shown in the floating overlay.
-     *
+     * Rebuilds the icon + counter rows for all enabled modes, shows / hides
+     * the Orns / EXP / Gold cells and updates the tracking summary.
+     * Four proofs per line so everything fits on narrow screens.
+     * (Also called by MainActivity after Settings were saved.)
+     */
+    fun refreshProofViews() {
+
+        val b = _binding ?: return
+
+        val ctx = context ?: return
+
+        // Orns / EXP / Gold visibility (shards are always shown, as before)
+        val shown = CurrencyTracking.getTracked(ctx)
+
+        b.statGold.root.visibility =
+            if (CurrencyTracking.Currency.GOLD in shown) View.VISIBLE else View.GONE
+
+        b.statOrns.root.visibility =
+            if (CurrencyTracking.Currency.ORNS in shown) View.VISIBLE else View.GONE
+
+        b.statExp.root.visibility =
+            if (CurrencyTracking.Currency.EXP in shown) View.VISIBLE else View.GONE
+
+        // compact header rates follow the same setting
+        b.compactGold.visibility =
+            if (CurrencyTracking.Currency.GOLD in shown) View.VISIBLE else View.GONE
+
+        b.compactOrns.visibility =
+            if (CurrencyTracking.Currency.ORNS in shown) View.VISIBLE else View.GONE
+
+        b.trackingSummaryText.text = trackingSummary()
+
+        b.proofsContainer.removeAllViews()
+        proofCountViews.clear()
+
+        val proofs = ProofTracking.activeProofs(ctx)
+
+        for (rowProofs in proofs.chunked(4)) {
+
+            val row = LinearLayout(ctx).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            }
+
+            for (proof in rowProofs) {
+
+                val (cell, counter) = UiKit.proofCell(
+                    ctx,
+                    proof.iconUrl,
+                    FightState.proofs[proof.id] ?: 0L
+                )
+
+                row.addView(cell)
+
+                proofCountViews[proof.id] = counter
+            }
+
+            b.proofsContainer.addView(row)
+        }
+
+        b.proofsContainer.visibility =
+            if (proofs.isEmpty()) View.GONE else View.VISIBLE
+    }
+
+    // ------------------------------------------------------------------
+    // Track dialog (what is tracked + what is shown in the overlay)
+    // ------------------------------------------------------------------
+
+    /**
      * Section 1: Orns / EXP / Gold
      * Section 2: Proofs / King's guard / Skeleton key
      *
@@ -208,30 +566,35 @@ class TrackerFragment : Fragment() {
         val curTracked = CurrencyTracking.getTracked(ctx).toMutableSet()
         val curOverlay = CurrencyTracking.getOverlay(ctx).toMutableSet()
 
-        val density = resources.displayMetrics.density
-        val pad = (16 * density).toInt()
+        val pad = UiKit.dp(ctx, 20)
 
         val root = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(pad, pad / 2, pad, 0)
+            setPadding(pad, UiKit.dp(ctx, 4), pad, 0)
         }
 
         fun addHeader(title: String) {
+
             root.addView(LinearLayout(ctx).apply {
+
                 orientation = LinearLayout.HORIZONTAL
-                setPadding(0, (8 * density).toInt(), 0, 0)
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, UiKit.dp(ctx, 12), 0, UiKit.dp(ctx, 2))
+
                 addView(TextView(ctx).apply {
-                    text = title
-                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    setTextAppearance(R.style.TextAppearance_FT_Overline)
+                    setTextColor(ContextCompat.getColor(ctx, R.color.ft_accent))
+                    text = title.uppercase()
                     layoutParams = LinearLayout.LayoutParams(
                         0,
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         1f
                     )
                 })
+
                 addView(TextView(ctx).apply {
-                    text = "Overlay"
-                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    setTextAppearance(R.style.TextAppearance_FT_Overline)
+                    text = getString(R.string.ft_overlay_column).uppercase()
                 })
             })
         }
@@ -247,9 +610,10 @@ class TrackerFragment : Fragment() {
             val row = LinearLayout(ctx).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
+                minimumHeight = UiKit.dp(ctx, 48)
             }
 
-            val check = android.widget.CheckBox(ctx).apply {
+            val check = MaterialCheckBox(ctx).apply {
                 text = label
                 isChecked = isTracked
                 layoutParams = LinearLayout.LayoutParams(
@@ -259,7 +623,7 @@ class TrackerFragment : Fragment() {
                 )
             }
 
-            val sw = androidx.appcompat.widget.SwitchCompat(ctx).apply {
+            val sw = MaterialSwitch(ctx).apply {
                 isChecked = isOverlay
                 isEnabled = isTracked
             }
@@ -279,7 +643,7 @@ class TrackerFragment : Fragment() {
         }
 
         // --- Orns / EXP / Gold ---
-        addHeader("Currencies")
+        addHeader(getString(R.string.ft_currencies))
 
         for (c in currencies) {
             addRow(
@@ -292,7 +656,7 @@ class TrackerFragment : Fragment() {
         }
 
         // --- Proofs / keys ---
-        addHeader("Proofs / misc")
+        addHeader(getString(R.string.ft_proofs_misc))
 
         for (mode in modes) {
             addRow(
@@ -308,10 +672,10 @@ class TrackerFragment : Fragment() {
             addView(root)
         }
 
-        android.app.AlertDialog.Builder(ctx)
-            .setTitle("Track")
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle(R.string.ft_track_title)
             .setView(scroll)
-            .setPositiveButton("OK") { _, _ ->
+            .setPositiveButton(R.string.ft_ok) { _, _ ->
 
                 ProofTracking.setModes(ctx, tracked)
                 ProofTracking.setOverlayModes(ctx, overlay)
@@ -321,388 +685,147 @@ class TrackerFragment : Fragment() {
 
                 refreshProofViews()
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(R.string.ft_cancel, null)
             .show()
     }
 
-    /**
-     * Rebuilds the icon + counter rows for all enabled modes
-     * and shows / hides the Orns / EXP / Gold lines.
-     * Four icons per row so everything fits on narrow screens.
-     */
-    private fun refreshProofViews() {
+    // ------------------------------------------------------------------
+    // Run history
+    // ------------------------------------------------------------------
 
-        val b = _binding ?: return
+    private fun reloadHistory() {
 
         val ctx = context ?: return
 
-        // Orns / EXP / Gold visibility
-        val shown = CurrencyTracking.getTracked(ctx)
+        allRuns = RunStorage.loadRuns(ctx)
 
-        b.goldText.visibility =
-            if (CurrencyTracking.Currency.GOLD in shown) View.VISIBLE else View.GONE
+        applyFilters()
+    }
 
-        b.ornsText.visibility =
-            if (CurrencyTracking.Currency.ORNS in shown) View.VISIBLE else View.GONE
+    private fun ornsPerMinute(run: RunRecord): Double {
 
-        b.expText.visibility =
-            if (CurrencyTracking.Currency.EXP in shown) View.VISIBLE else View.GONE
+        val minutes = UiKit.durationMinutes(run.duration)
 
-        b.proofModeButton.text =
-            "TRACKING: ${ProofTracking.modesLabel(ctx)}"
+        return if (minutes > 0.0) run.orns / minutes else 0.0
+    }
 
-        b.proofsContainer.removeAllViews()
-        proofCountViews.clear()
+    /** name, type and proof labels */
+    private fun matches(run: RunRecord, q: String): Boolean {
 
-        val density = resources.displayMetrics.density
-        val iconSize = (28 * density).toInt()
-        val gap = (10 * density).toInt()
+        val type = RunType.fromKey(run.type)
 
-        val proofs = ProofTracking.activeProofs(ctx)
+        val typeLabel = getString(type?.labelRes ?: R.string.ft_type_other)
 
-        for (rowProofs in proofs.chunked(4)) {
+        if (run.name.contains(q, ignoreCase = true)) return true
+        if (typeLabel.contains(q, ignoreCase = true)) return true
 
-            val row = LinearLayout(ctx).apply {
-
-                orientation = LinearLayout.HORIZONTAL
-
-                gravity = Gravity.CENTER_VERTICAL
-
-                setPadding(0, (4 * density).toInt(), 0, (4 * density).toInt())
-            }
-
-            for (proof in rowProofs) {
-
-                val icon = ImageView(ctx).apply {
-
-                    layoutParams = LinearLayout.LayoutParams(iconSize, iconSize)
-
-                    scaleType = ImageView.ScaleType.FIT_CENTER
-
-                    load(proof.iconUrl) {
-                        crossfade(false)
-                        error(android.R.drawable.ic_menu_help)
-                    }
-                }
-
-                val count = TextView(ctx).apply {
-
-                    text = fmt(FightState.proofs[proof.id] ?: 0L)
-
-                    textSize = 18f
-
-                    setPadding((4 * density).toInt(), 0, gap, 0)
-                }
-
-                row.addView(icon)
-                row.addView(count)
-
-                proofCountViews[proof.id] = count
-            }
-
-            b.proofsContainer.addView(row)
+        return ProofTracking.allProofs.any { proof ->
+            (run.proofs[proof.id] ?: 0L) > 0L &&
+                    proof.label.contains(q, ignoreCase = true)
         }
     }
 
-    private fun renderHistory() {
+    private fun applyFilters() {
 
         val b = _binding ?: return
+        val ctx = context ?: return
 
-        Log.d("RUN_HISTORY", "renderHistory CALLED")
+        val filter = typeFilter
 
-        val runs = RunStorage.loadRuns(requireContext())
-
-        b.historyContainer.removeAllViews()
-
-        fun statRow(iconRes: Int, label: String, value: String): android.view.View {
-
-            val row = android.widget.LinearLayout(requireContext()).apply {
-                orientation = android.widget.LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.CENTER_VERTICAL
-                setPadding(0, 12, 0, 12)
-            }
-
-            val icon = android.widget.ImageView(requireContext()).apply {
-                setImageResource(iconRes)
-                layoutParams = android.widget.LinearLayout.LayoutParams(48, 48)
-            }
-
-            val text = android.widget.TextView(requireContext()).apply {
-                this.text = "$label: $value"
-                textSize = 16f
-                setPadding(24, 0, 0, 0)
-            }
-
-            row.addView(icon)
-            row.addView(text)
-
-            return row
+        var list = allRuns.filter { run ->
+            (filter == null || run.type == filter.key) &&
+                    (query.isEmpty() || matches(run, query))
         }
 
-        // same row, but the icon comes from a URL
-        fun statRowUrl(iconUrl: String, label: String, value: String): android.view.View {
-
-            val row = android.widget.LinearLayout(requireContext()).apply {
-                orientation = android.widget.LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.CENTER_VERTICAL
-                setPadding(0, 12, 0, 12)
-            }
-
-            val icon = android.widget.ImageView(requireContext()).apply {
-
-                layoutParams = android.widget.LinearLayout.LayoutParams(48, 48)
-
-                load(iconUrl) {
-                    crossfade(false)
-                    error(android.R.drawable.ic_menu_help)
-                }
-            }
-
-            val text = android.widget.TextView(requireContext()).apply {
-                this.text = "$label: $value"
-                textSize = 16f
-                setPadding(24, 0, 0, 0)
-            }
-
-            row.addView(icon)
-            row.addView(text)
-
-            return row
+        list = when (sort) {
+            Sort.NEWEST -> list.sortedByDescending { it.runid.toLongOrNull() ?: 0L }
+            Sort.MOST_GOLD -> list.sortedByDescending { it.gold }
+            Sort.ORNS_PER_MIN -> list.sortedByDescending { ornsPerMinute(it) }
         }
 
-        val deleteicon = android.R.drawable.star_big_on
-        val goldIcon = R.drawable.gold
-        val ornsIcon = R.drawable.orns
-        val xpIcon = R.drawable.exp_potion
-        val shardIcon = R.drawable.tower_fragment
+        adapter.submitList(list)
 
-        runs.forEachIndexed { index, run ->
+        val totalGold = list.sumOf { it.gold }
 
-            val tile = android.widget.LinearLayout(requireContext()).apply {
-                orientation = android.widget.LinearLayout.VERTICAL
-                setPadding(32, 24, 32, 24)
-                background = android.graphics.drawable.GradientDrawable().apply {
-                    cornerRadius = 24f
+        val goldText =
+            if (totalGold >= 1_000_000L)
+                String.format(java.util.Locale.US, "%.1f M", totalGold / 1_000_000.0)
+            else
+                UiKit.fmt(totalGold)
 
-                    setColor(
-                        com.google.android.material.color.MaterialColors.getColor(
-                            context,
-                            com.google.android.material.R.attr.colorSurface,
-                            0
-                        )
-                    )
+        b.summaryText.text = getString(
+            R.string.ft_summary_format,
+            resources.getQuantityString(R.plurals.ft_run_count, list.size, list.size),
+            goldText
+        )
 
-                    setStroke(
-                        2,
-                        com.google.android.material.color.MaterialColors.getColor(
-                            context,
-                            com.google.android.material.R.attr.colorOutline,
-                            0
-                        )
-                    )
-                }
+        b.emptyText.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+    }
 
-                val params = android.widget.LinearLayout.LayoutParams(
-                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-                params.setMargins(0, 0, 0, 24)
-                layoutParams = params
+    private fun showRenameDialog(run: RunRecord) {
+
+        val ctx = requireContext()
+
+        val d = DialogRenameBinding.inflate(LayoutInflater.from(ctx))
+
+        d.renameInput.setText(run.name)
+        d.renameInput.setSelection(d.renameInput.text?.length ?: 0)
+
+        // type picker: the five types + "Other" (= no type)
+        val options: List<Pair<RunType?, Int>> =
+            RunType.values().map { it to it.labelRes } + (null to R.string.ft_type_other)
+
+        var selectedType: RunType? = RunType.fromKey(run.type)
+
+        for ((type, label) in options) {
+
+            val chip = LayoutInflater.from(ctx)
+                .inflate(R.layout.item_filter_chip, d.typeGroup, false) as Chip
+
+            chip.id = View.generateViewId()
+            chip.setText(label)
+            chip.isChecked = (type == selectedType)
+
+            chip.setOnCheckedChangeListener { _, checked ->
+                if (checked) selectedType = type
             }
 
-            // format numbers
-            val gold = fmt(run.gold)
-            val orns = fmt(run.orns)
-            val exp = fmt(run.exp)
-            val shards = fmt(run.shards)
-
-            // run header (date + duration)
-            val header = LinearLayout(requireContext()).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, 0, 0, 16)
-            }
-
-            val dateText = TextView(requireContext()).apply {
-                text = run.date
-                textSize = 14f
-
-                setTextColor(
-                    com.google.android.material.color.MaterialColors.getColor(
-                        context,
-                        com.google.android.material.R.attr.colorOnSurface,
-                        android.graphics.Color.WHITE
-                    )
-                )
-
-                layoutParams = LinearLayout.LayoutParams(
-                    0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    1f
-                )
-            }
-
-            val nameText = TextView(requireContext()).apply {
-
-                text = if (run.name.isBlank()) "" else run.name
-
-                textSize = 20f
-                setTypeface(typeface, android.graphics.Typeface.BOLD)
-
-                textAlignment = View.TEXT_ALIGNMENT_CENTER
-
-                layoutParams = LinearLayout.LayoutParams(
-                    0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    1f
-                )
-            }
-
-            val durationText = TextView(requireContext()).apply {
-                text = run.duration
-                textSize = 14f
-
-                setTextColor(
-                    com.google.android.material.color.MaterialColors.getColor(
-                        context,
-                        com.google.android.material.R.attr.colorOnSurface,
-                        android.graphics.Color.WHITE
-                    )
-                )
-
-                layoutParams = LinearLayout.LayoutParams(
-                    0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    1f
-                )
-
-                textAlignment = View.TEXT_ALIGNMENT_TEXT_END
-            }
-
-            header.addView(dateText)
-            header.addView(nameText)
-            header.addView(durationText)
-
-            // delete run button
-            val deleteBtn = android.widget.TextView(requireContext()).apply {
-                text = "Delete"
-                setTextColor(android.graphics.Color.RED)
-                visibility = View.GONE
-                setPadding(0, 16, 0, 0)
-
-                layoutParams = android.widget.LinearLayout.LayoutParams(
-                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-            }
-
-            deleteBtn.setOnClickListener {
-                RunStorage.deleteRun(requireContext(), run.runid)
-                Log.d("RUN_HISTORY", "Deleted run at index $index")
-                renderHistory()
-            }
-
-            val renameBtn = android.widget.TextView(requireContext()).apply {
-
-                text = "Rename"
-
-                setTextColor(
-                    com.google.android.material.color.MaterialColors.getColor(
-                        context,
-                        com.google.android.material.R.attr.colorPrimary,
-                        android.graphics.Color.GREEN
-                    )
-                )
-
-                visibility = View.GONE
-
-                setPadding(0, 8, 0, 0)
-
-                layoutParams = android.widget.LinearLayout.LayoutParams(
-                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    marginEnd = 32
-                }
-            }
-
-            renameBtn.setOnClickListener {
-
-                val input = android.widget.EditText(requireContext())
-
-                input.setText(run.name)
-
-                android.app.AlertDialog.Builder(requireContext())
-                    .setTitle("Rename Run")
-                    .setView(input)
-                    .setPositiveButton("Save") { _, _ ->
-
-                        RunStorage.renameRun(
-                            requireContext(),
-                            run.runid,
-                            input.text.toString().trim()
-                        )
-
-                        renderHistory()
-                    }
-                    .setNegativeButton("Cancel", null)
-                    .show()
-            }
-
-
-            // long press to show delete
-            tile.setOnLongClickListener {
-                deleteBtn.visibility = View.VISIBLE
-                renameBtn.visibility = View.VISIBLE
-                true
-            }
-
-            // build card
-            tile.addView(header)
-            tile.addView(statRow(goldIcon, "Gold", gold))
-            tile.addView(statRow(ornsIcon, "Orns", orns))
-            tile.addView(statRow(xpIcon, "XP", exp))
-            if (run.shards > 0) {
-                tile.addView(
-                    statRow(
-                        shardIcon,
-                        "Tower Shards",
-                        shards
-                    )
-                )
-            }
-
-            // proofs / skeleton keys collected in this run
-            for (proof in ProofTracking.allProofs) {
-
-                val count = run.proofs[proof.id] ?: 0L
-
-                if (count > 0L) {
-
-                    tile.addView(
-                        statRowUrl(
-                            proof.iconUrl,
-                            proof.label,
-                            fmt(count)
-                        )
-                    )
-                }
-            }
-
-            val buttonRow = android.widget.LinearLayout(requireContext()).apply {
-
-                orientation = android.widget.LinearLayout.HORIZONTAL
-
-                gravity = android.view.Gravity.START
-
-            }
-
-            buttonRow.addView(renameBtn)
-            buttonRow.addView(deleteBtn)
-
-            tile.addView(buttonRow)
-
-            b.historyContainer.addView(tile)
+            d.typeGroup.addView(chip)
         }
+
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle(R.string.ft_rename_title)
+            .setView(d.root)
+            .setPositiveButton(R.string.ft_save) { _, _ ->
+
+                RunStorage.renameRun(
+                    ctx,
+                    run.runid,
+                    d.renameInput.text.toString().trim()
+                )
+
+                RunStorage.setRunType(ctx, run.runid, selectedType?.key)
+
+                reloadHistory()
+            }
+            .setNegativeButton(R.string.ft_cancel, null)
+            .show()
+    }
+
+    private fun confirmDelete(run: RunRecord) {
+
+        val ctx = requireContext()
+
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle(R.string.ft_delete_title)
+            .setMessage(R.string.ft_delete_message)
+            .setPositiveButton(R.string.ft_delete) { _, _ ->
+
+                RunStorage.deleteRun(ctx, run.runid)
+
+                reloadHistory()
+            }
+            .setNegativeButton(R.string.ft_cancel, null)
+            .show()
     }
 }

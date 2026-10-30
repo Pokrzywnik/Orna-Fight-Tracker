@@ -19,7 +19,7 @@
         android:icon="@mipmap/ic_launcher"
         android:label="FightTracker"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+        android:theme="@style/Theme.FightTracker"
         android:name=".FightTrackerApp">
 
         <provider

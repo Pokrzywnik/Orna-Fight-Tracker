@@ -25,6 +25,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.nio.ByteBuffer
+import java.util.concurrent.Executors
 import android.graphics.Color
 import android.graphics.Rect
 import kotlin.math.max
@@ -34,6 +35,7 @@ import kotlin.math.min
 class FightTrackerService : Service() {
 
     companion object {
+
         const val CHANNEL_ID = "fight_tracker_channel"
         var startTime = 0L
 
@@ -42,6 +44,34 @@ class FightTrackerService : Service() {
 
         /** true = wyłącza automatyczne ucinanie lewej strony (czerwony pixel / ikona gold) */
         private const val DISABLE_LEFT_CROP = true
+
+
+        private const val EXPERIMENTAL_USE_USER_CROP = false    // was false
+        /** Built-in scan region. Rewards were never above 24% or below 59% of the screen. */
+        private const val EXP_ROI_TOP = 0.20f
+        private const val EXP_ROI_BOTTOM = 0.70f
+
+        /** < this fraction of sampled pixels changed since the previous tick = screen is settled */
+        private const val EXP_STABLE_DIFF = 0.05f
+
+        /** >= this = big change (popup opened / closed / scrolled) */
+        private const val EXP_BIG_CHANGE_DIFF = 0.20f
+        /** commit as soon as ONE frame is "solid" (header + xp + gold + orns) */
+
+        /**
+         * EXPERIMENTAL (PaddleOCR) mode.
+         *
+         * false = whole screenshot is scanned (no crop)
+         * true  = only the user's SET CROP region is scanned
+         *         (useful if the "total currency" bar on top of the
+         *         reward screen gets read as a reward)
+         */
+
+        /** how many identical reads are needed to accept a reward */
+
+
+        /** how many non-reward frames in a row mean "reward screen closed" */
+
 
         @Volatile
         var instance: FightTrackerService? = null
@@ -73,7 +103,14 @@ class FightTrackerService : Service() {
     private var lastExp = -1L
     private var lastProofs: Map<String, Long> = emptyMap()
 
+    @Volatile
     private var ocrBusy = false
+
+
+
+
+    @Volatile
+    private var destroyed = false
 
     private var rewardScreenSeen = false
     private var mediaProjection: MediaProjection? = null
@@ -82,8 +119,21 @@ class FightTrackerService : Service() {
 
     private val handler = Handler(Looper.getMainLooper())
 
+    private var scanLoop: Runnable? = null
+
     private val recognizer =
         TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+
+    // ------------------------------------------------------------------
+    // EXPERIMENTAL OCR state (main thread only)
+    // ------------------------------------------------------------------
+
+    private val paddleExecutor = Executors.newSingleThreadExecutor()
+
+    /** parsed reward -> how many frames produced exactly this reading */
+
+
+
 
     override fun onCreate() {
         super.onCreate()
@@ -160,13 +210,39 @@ class FightTrackerService : Service() {
             Handler(Looper.getMainLooper())
         )
         startTime = System.currentTimeMillis()
+
+        // Load Paddle models in the background so the first scan is not delayed
+        if (SettingsStore.getExperimentalOcr(this)) {
+
+            try {
+
+                paddleExecutor.execute {
+
+                    try {
+
+                        RewardOcrEngine.warmUp(applicationContext)
+
+                    } catch (e: Exception) {
+
+                        Log.e("OCR_RAW", "Paddle warm-up failed", e)
+                    }
+                }
+
+            } catch (e: Exception) {
+
+                Log.e("OCR_RAW", "Could not schedule Paddle warm-up", e)
+            }
+        }
+
         startCapture()
 
         return START_STICKY
     }
 
     private fun startCapture() {
-        val interval = SettingsStore.getScanInterval(this@FightTrackerService)
+        val interval =
+            if (SettingsStore.getExperimentalOcr(this)) 50L
+            else SettingsStore.getScanInterval(this@FightTrackerService)
 
         val metrics = resources.displayMetrics
 
@@ -190,16 +266,21 @@ class FightTrackerService : Service() {
                 null
             )
 
-        handler.postDelayed(object : Runnable {
+        val loop = object : Runnable {
 
             override fun run() {
+
+                if (destroyed) return
 
                 scanScreen()
 
                 handler.postDelayed(this, interval)
             }
+        }
 
-        }, interval)
+        scanLoop = loop
+
+        handler.postDelayed(loop, interval)
     }
 
     /**
@@ -507,12 +588,322 @@ class FightTrackerService : Service() {
 
     private fun scanScreen() {
 
-        if (SettingsStore.getLegacyOcr(this)) {
-            scanScreenLegacy()
-        } else {
-            scanScreenModern()
+        when {
+
+            // overrides "use legacy OCR algorithm"
+            SettingsStore.getExperimentalOcr(this) ->
+                scanScreenExperimental()
+
+            SettingsStore.getLegacyOcr(this) ->
+                scanScreenLegacy()
+
+            else ->
+                scanScreenModern()
         }
     }
+
+    // ------------------------------------------------------------------
+    // EXPERIMENTAL: PaddleOCR
+    // ------------------------------------------------------------------
+
+    /** built-in region, or the user's SET CROP when EXPERIMENTAL_USE_USER_CROP */
+    private fun experimentalRegion(w: Int, h: Int): Rect {
+
+        if (
+            EXPERIMENTAL_USE_USER_CROP &&
+            CropStore.load(applicationContext) != null
+        ) {
+            return resolveCrop(w, h)
+        }
+
+        return Rect(
+            0,
+            (h * EXP_ROI_TOP).toInt(),
+            w,
+            (h * EXP_ROI_BOTTOM).toInt()
+        )
+    }
+
+    private fun scanScreenExperimental() {
+
+        val reader = imageReader ?: return
+
+        val image: Image =
+            try {
+                reader.acquireLatestImage()
+            } catch (e: Exception) {
+                Log.e("OCR_RAW", "acquireLatestImage failed", e)
+                null
+            } ?: return
+
+        val captureMs = android.os.SystemClock.elapsedRealtime()
+
+        // cheap (~0.1 ms): runs on EVERY tick, also while OCR is busy
+        val diff = frameDiff(image)
+
+        if (diff >= EXP_STABLE_DIFF) {
+            // screen is moving / changed: it must be scanned once it settles
+            expNeedScan = true
+            expRetries = 0
+        }
+
+        if (diff >= EXP_BIG_CHANGE_DIFF) {
+            expBigChange = true
+        }
+
+        // only scan a SETTLED screen that was not scanned yet,
+        // and never queue frames while a scan is running
+        if (ocrBusy || diff >= EXP_STABLE_DIFF || !expNeedScan) {
+            image.close()
+            return
+        }
+
+        expNeedScan = false
+
+        val bigChangeBefore = expBigChange
+        expBigChange = false
+
+        var fullBitmap: Bitmap? = null
+
+        try {
+
+            val plane = image.planes[0]
+            val buffer: ByteBuffer = plane.buffer
+
+            val pixelStride = plane.pixelStride
+            val rowStride = plane.rowStride
+            val rowPadding = rowStride - pixelStride * image.width
+
+            val padded = Bitmap.createBitmap(
+                image.width + rowPadding / pixelStride,
+                image.height,
+                Bitmap.Config.ARGB_8888
+            )
+
+            buffer.rewind()
+            padded.copyPixelsFromBuffer(buffer)
+
+            fullBitmap =
+                if (padded.width != image.width) {
+                    Bitmap.createBitmap(padded, 0, 0, image.width, image.height)
+                        .also { padded.recycle() }
+                } else {
+                    padded
+                }
+
+        } catch (e: Exception) {
+
+            Log.e("OCR_RAW", "Experimental: could not build bitmap", e)
+            recycleBitmapSafe(fullBitmap)
+            expNeedScan = true
+            return
+
+        } finally {
+
+            image.close()
+        }
+
+        val frame = fullBitmap ?: return
+
+        ocrBusy = true
+
+        try {
+
+            paddleExecutor.execute {
+
+                var cropped: Bitmap? = null
+
+                try {
+
+                    val r = experimentalRegion(frame.width, frame.height)
+
+                    cropped = Bitmap.createBitmap(
+                        frame, r.left, r.top, r.width(), r.height()
+                    )
+
+                    val input: Bitmap = cropped
+
+                    // the scanned image IS the reward band (header may be cut off)
+                    val scan = RewardOcrEngine.scan(
+                        applicationContext,
+                        input,
+                        stopWhen = { partial ->
+                            // stop reading as soon as xp + gold + orns are known:
+                            // the drop list below them is never recognised
+                            val p = RewardTextParser.parse(applicationContext, partial, true)
+                            p.xpRow != null && p.goldRow != null && p.ornsRow != null
+                        }
+                    )
+
+                    if (Thread.currentThread().isInterrupted) {
+                        return@execute
+                    }
+
+                    val result =
+                        RewardTextParser.parse(applicationContext, scan, true)
+
+                    handler.post {
+                        if (!destroyed) {
+                            onExperimentalResult(scan, result, r, captureMs, bigChangeBefore)
+                        }
+                    }
+
+                } catch (e: Exception) {
+
+                    Log.e("OCR_RAW", "Experimental OCR failed", e)
+
+                } finally {
+
+                    recycleBitmapSafe(cropped)
+                    recycleBitmapSafe(frame)
+
+                    ocrBusy = false
+                }
+            }
+
+        } catch (e: Exception) {
+
+            Log.e("OCR_RAW", "Could not start experimental OCR", e)
+            recycleBitmapSafe(frame)
+            ocrBusy = false
+            expNeedScan = true
+        }
+    }
+
+    /**
+     * Runs on the main thread after every Paddle frame.
+     *
+     * Reward is accepted when:
+     *  - EXPERIMENTAL_REQUIRED_VOTES frames produced exactly the same
+     *    reading (protects against half-rendered screens / misreads), or
+     *  - the reward screen closed - then the most frequent reading wins.
+     */
+    private fun onExperimentalResult(
+        scan: RewardOcrEngine.ScanResult,
+        result: RewardTextParser.Result,
+        region: Rect,
+        captureMs: Long,
+        bigChangeBefore: Boolean
+    ) {
+
+        val latencyMs = android.os.SystemClock.elapsedRealtime() - captureMs
+
+        val rowsText =
+            scan.rows.joinToString("\n") { it.text }
+
+        if (DebugController.enabled) {
+
+            OcrDebugBuffer.lastText = rowsText
+
+            OcrDebugBuffer.userCrop = region
+            OcrDebugBuffer.finalCrop = region
+            OcrDebugBuffer.bookmarkRect = null
+
+            fun toScreen(row: RewardOcrEngine.OcrBox?): Rect? =
+                row?.let {
+                    Rect(
+                        region.left + it.left,
+                        region.top + it.top,
+                        region.left + it.right,
+                        region.top + it.bottom
+                    )
+                }
+
+            OcrDebugBuffer.xpRect = toScreen(result.xpRow)
+            OcrDebugBuffer.ornsRect = toScreen(result.ornsRow)
+            OcrDebugBuffer.goldRect = toScreen(result.goldRow)
+        }
+
+        Log.d("OCR_RAW", "================ PADDLE FRAME ================")
+        Log.d("OCR_RAW", rowsText)
+
+        TrackerLogger.write(
+            "OCR_BITMAP",
+            "PADDLE region=${region.width()}x${region.height()} " +
+                    "boxes=${scan.boxCount} read=${scan.recognizedCount} " +
+                    "early=${scan.stoppedEarly} " +
+                    "det=%.0fms rec=%.0fms".format(scan.detectMs, scan.recognizeMs)
+        )
+
+        TrackerLogger.write("OCR_RAW", "================ PADDLE FRAME ================")
+        TrackerLogger.write("OCR_RAW", rowsText)
+        TrackerLogger.write(
+            "TRACKER_LOG",
+            "PADDLE parsed=${result.parsed} rewardScreen=${result.rewardScreen} " +
+                    "solid=${result.solid} capture->parsed=${latencyMs}ms"
+        )
+
+        // nothing that looks like a reward on this settled screen
+        if (!result.rewardScreen) {
+            return
+        }
+
+        if (!result.solid) {
+
+            // settled but incomplete: look once more (rows may still be appearing)
+            if (expRetries < 1) {
+
+                expRetries++
+                expNeedScan = true
+
+                TrackerLogger.write("TRACKER_LOG", "PADDLE incomplete -> one more look")
+
+                return
+            }
+
+            // still incomplete: only trust it when at least the xp row was read
+            if (result.parsed.exp <= 0L) {
+                return
+            }
+
+            TrackerLogger.write("TRACKER_LOG", "PADDLE PARTIAL reward committed")
+        }
+
+        // The same reading again = the same popup (re-scanned after a small
+        // animation or after scrolling it) -> never count it twice.
+        // After a big change (popup closed + opened) the same numbers are
+        // accepted as a NEW reward, unless the rows moved (= scrolled).
+        val xpTop = result.xpRow?.top ?: -1
+
+        val same =
+            result.parsed == expLastCommitted &&
+                    (!bigChangeBefore || xpTop != expLastCommittedXpTop)
+
+        if (same) {
+
+            TrackerLogger.write("TRACKER_LOG", "PADDLE duplicate of the last reward - ignored")
+
+            return
+        }
+
+        expLastCommitted = result.parsed
+        expLastCommittedXpTop = xpTop
+
+        commitExperimental(result.parsed)
+
+        TrackerLogger.write(
+            "TRACKER_LOG",
+            "COMMIT capture->commit=${latencyMs}ms"
+        )
+    }
+
+
+
+    private fun commitExperimental(p: RewardTextParser.Parsed) {
+
+        commitReward(
+            sessionGold = p.gold,
+            sessionOrns = p.orns,
+            sessionExp = p.exp,
+            sessionShards = p.shards,
+            sessionProofs = p.proofs,
+            checkDuplicate = false
+        )
+    }
+
+    // ------------------------------------------------------------------
+    // LEGACY: ML Kit, no first pass
+    // ------------------------------------------------------------------
 
     private fun scanScreenLegacy() {
 
@@ -718,6 +1109,10 @@ class FightTrackerService : Service() {
                 recycleBitmapSafe(scaledBitmap)
             }
     }
+
+    // ------------------------------------------------------------------
+    // MODERN: ML Kit, two passes
+    // ------------------------------------------------------------------
 
     private fun scanScreenModern() {
 
@@ -1582,7 +1977,14 @@ class FightTrackerService : Service() {
         val countPart =
             """(?:\s*[(\[{]\s*(\d{1,4})\s*[)\]}]?)?"""
 
-        for (proof in ProofTracking.activeProofs(this)) {
+        val active = ProofTracking.activeProofs(this)
+
+        TrackerLogger.write(
+            "TRACKER_LOG",
+            "PROOFS active=${active.map { it.id }} flat=[$flat]"
+        )
+
+        for (proof in active) {
 
             val regex =
                 Regex(proof.pattern + countPart)
@@ -1599,6 +2001,8 @@ class FightTrackerService : Service() {
                 result[proof.id] = total
             }
         }
+
+        TrackerLogger.write("TRACKER_LOG", "PROOFS result=$result")
 
         return result
     }
@@ -1740,23 +2144,49 @@ class FightTrackerService : Service() {
         // proofs / keys are parsed from the whole text (names can wrap)
         val sessionProofs = parseProofs(text)
 
-        // duplicate check
-        if (
-            sessionGold == lastGold &&
-            sessionOrns == lastOrns &&
-            sessionExp == lastExp &&
-            sessionShards == lastShards &&
-            sessionProofs == lastProofs
-        ) {
-            return
-        }
+        commitReward(
+            sessionGold = sessionGold,
+            sessionOrns = sessionOrns,
+            sessionExp = sessionExp,
+            sessionShards = sessionShards,
+            sessionProofs = sessionProofs,
+            checkDuplicate = true
+        )
+    }
 
-        // store last seen values
-        lastGold = sessionGold
-        lastOrns = sessionOrns
-        lastExp = sessionExp
-        lastShards = sessionShards
-        lastProofs = sessionProofs
+    /**
+     * Shared by ML Kit and Paddle paths:
+     * duplicate check (ML Kit only) -> >3M orns confirmation -> apply.
+     */
+    private fun commitReward(
+        sessionGold: Long,
+        sessionOrns: Long,
+        sessionExp: Long,
+        sessionShards: Long,
+        sessionProofs: Map<String, Long>,
+        checkDuplicate: Boolean
+    ) {
+
+        if (checkDuplicate) {
+
+            // duplicate check
+            if (
+                sessionGold == lastGold &&
+                sessionOrns == lastOrns &&
+                sessionExp == lastExp &&
+                sessionShards == lastShards &&
+                sessionProofs == lastProofs
+            ) {
+                return
+            }
+
+            // store last seen values
+            lastGold = sessionGold
+            lastOrns = sessionOrns
+            lastExp = sessionExp
+            lastShards = sessionShards
+            lastProofs = sessionProofs
+        }
 
         val delta = RewardDelta(
             sessionGold,
@@ -1796,10 +2226,88 @@ class FightTrackerService : Service() {
 
         return digits.toLongOrNull() ?: 0L
     }
+    private var lastSamples: IntArray? = null
+    /** true = the screen changed since it was last scanned; scan it once it settles */
+    private var expNeedScan = true
 
+    /** a big change happened since the last scan started */
+    private var expBigChange = false
+
+    /** extra looks at a settled but incomplete reward screen */
+    private var expRetries = 0
+
+    private var expLastCommitted: RewardTextParser.Parsed? = null
+
+    private var expLastCommittedXpTop = -1
+
+    /**
+     * Fraction (0..1) of the sampled pixels that changed since the previous
+     * tick. 1.0 for the very first frame.
+     */
+    private fun frameDiff(image: Image): Float {
+
+        val plane = image.planes[0]
+        val buf = plane.buffer
+        val ps = plane.pixelStride
+        val rs = plane.rowStride
+
+        val cols = 24
+        val rows = 48
+
+        val cur = IntArray(cols * rows)
+
+        var i = 0
+
+        for (yi in 0 until rows) {
+
+            val y = yi * (image.height - 1) / (rows - 1)
+
+            for (xi in 0 until cols) {
+
+                val x = xi * (image.width - 1) / (cols - 1)
+
+                val o = y * rs + x * ps
+
+                if (o + 2 < buf.limit()) {
+
+                    val r = (buf.get(o).toInt() and 0xFF) shr 4
+                    val g = (buf.get(o + 1).toInt() and 0xFF) shr 4
+                    val b = (buf.get(o + 2).toInt() and 0xFF) shr 4
+
+                    cur[i] = (r shl 8) or (g shl 4) or b
+                }
+
+                i++
+            }
+        }
+
+        val prev = lastSamples
+
+        lastSamples = cur
+
+        if (prev == null) return 1f
+
+        var diff = 0
+
+        for (k in cur.indices) {
+            if (cur[k] != prev[k]) diff++
+        }
+
+        return diff.toFloat() / cur.size
+    }
     override fun onDestroy() {
 
+        destroyed = true
+
         instance = null
+
+        // stop the scan loop (it used to keep running after the service died)
+        scanLoop?.let { handler.removeCallbacks(it) }
+        handler.removeCallbacksAndMessages(null)
+
+        // terminate a running Paddle inference and stop the worker
+        RewardOcrEngine.cancel()
+        paddleExecutor.shutdownNow()
 
         virtualDisplay?.release()
         imageReader?.close()

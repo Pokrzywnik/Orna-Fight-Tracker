@@ -63,18 +63,24 @@ object TrackingController {
 
         val runid = System.currentTimeMillis().toString()
 
+        val proofs = FightState.proofs.toMap()
+
+        // best guess of what was farmed; can be changed in the rename dialog
+        val type = RunType.infer(proofs, FightState.shards)?.key
+
         RunStorage.saveRun(
             app,
             RunRecord(
-                runid,
-                date,
-                duration,
-                FightState.gold,
-                FightState.orns,
-                FightState.exp,
-                FightState.shards,
-                "",
-                FightState.proofs.toMap()
+                runid = runid,
+                date = date,
+                duration = duration,
+                gold = FightState.gold,
+                orns = FightState.orns,
+                exp = FightState.exp,
+                shards = FightState.shards,
+                name = "",
+                proofs = proofs,
+                type = type
             )
         )
 

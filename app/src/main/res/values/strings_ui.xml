@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Navigation -->
+    <string name="ft_nav_tracker">Tracker</string>
+    <string name="ft_nav_materials">Materials</string>
+    <string name="ft_nav_codex">Codex</string>
+    <string name="ft_nav_gleaming">Gleaming</string>
+    <string name="ft_nav_guides">Guides</string>
+
+    <!-- Common -->
+    <string name="ft_overline_reference">REFERENCE</string>
+    <string name="ft_settings">Settings</string>
+    <string name="ft_save">Save</string>
+    <string name="ft_cancel">Cancel</string>
+    <string name="ft_ok">OK</string>
+    <string name="ft_close">Close</string>
+
+    <!-- Tracker -->
+    <string name="ft_overline_tracker">FIGHT TRACKER</string>
+    <string name="ft_tracker_title">Tracker</string>
+    <string name="ft_overlay">Assess Overlay</string>
+    <string name="ft_tracking">TRACKING</string>
+    <string name="ft_idle">IDLE</string>
+    <string name="ft_start">Start</string>
+    <string name="ft_stop">Stop</string>
+    <string name="ft_undo">Undo last reward</string>
+    <string name="ft_toggle_run_card">Expand or collapse current run</string>
+    <string name="ft_nothing_to_undo">Nothing to undo</string>
+    <string name="ft_debug_on">debug enabled</string>
+    <string name="ft_debug_off">debug disabled</string>
+    <string name="ft_zero_timer">00:00:00</string>
+    <string name="ft_label_gold">GOLD</string>
+    <string name="ft_label_orns">ORNS</string>
+    <string name="ft_label_exp">EXP</string>
+    <string name="ft_label_shards">SHARDS</string>
+    <string name="ft_per_min">%1$s/min</string>
+    <string name="ft_per_min_short">%1$s/m</string>
+    <string name="ft_dash">–</string>
+    <string name="ft_tracking_summary">TRACKING: %1$s</string>
+    <string name="ft_tracking_nothing">Nothing</string>
+    <string name="ft_anguish_version_label">Anguish %1$s</string>
+    <string name="ft_kings_guard">King\'s guard</string>
+    <string name="ft_skeleton_key">Skeleton key</string>
+
+    <!-- Run history -->
+    <string name="ft_run_history">Run history</string>
+    <string name="ft_run_history_hint">tap a run for details</string>
+    <string name="ft_search_hint">Search runs, proofs…</string>
+    <string name="ft_chip_all">All</string>
+    <string name="ft_chip_anguish">Anguish</string>
+    <string name="ft_chip_towers">Towers</string>
+    <string name="ft_chip_coral">Coral</string>
+    <string name="ft_chip_guard">Guard</string>
+    <string name="ft_chip_remembrance">Remembrance</string>
+    <string name="ft_type_other">Other</string>
+    <string name="ft_summary_format">%1$s · %2$s gold</string>
+    <plurals name="ft_run_count">
+        <item quantity="one">%d run</item>
+        <item quantity="other">%d runs</item>
+    </plurals>
+    <string name="ft_sort_newest">Newest</string>
+    <string name="ft_sort_gold">Most gold</string>
+    <string name="ft_sort_orns_min">Orns / min</string>
+    <string name="ft_sort_format">%1$s ▾</string>
+    <string name="ft_run_default">Run</string>
+    <string name="ft_rename">Rename</string>
+    <string name="ft_delete">Delete</string>
+    <string name="ft_rename_title">Rename run</string>
+    <string name="ft_rename_hint">Run name</string>
+    <string name="ft_run_type">Type</string>
+    <string name="ft_delete_title">Delete run?</string>
+    <string name="ft_delete_message">This run will be removed from your history.</string>
+    <string name="ft_no_runs">No runs match your search</string>
+
+    <!-- Track dialog -->
+    <string name="ft_track_title">Track</string>
+    <string name="ft_currencies">Currencies</string>
+    <string name="ft_proofs_misc">Proofs / misc</string>
+    <string name="ft_overlay_column">Overlay</string>
+
+    <!-- Materials -->
+    <string name="ft_overline_forecast">DAILY FORECAST</string>
+    <string name="ft_materials_title">Materials</string>
+    <string name="ft_calendar">Calendar</string>
+    <string name="ft_guilds">Guilds</string>
+    <string name="ft_materials_button">Materials</string>
+    <string name="ft_info">Info</string>
+    <string name="ft_materials_today">Materials Today</string>
+    <string name="ft_materials_tomorrow">Materials Tomorrow</string>
+    <string name="ft_today">TODAY</string>
+    <string name="ft_tomorrow">TOMORROW</string>
+    <string name="ft_nothing_listed">Nothing listed</string>
+    <string name="ft_material_calendar">Material Calendar</string>
+    <string name="ft_search_material">Search material…</string>
+    <string name="ft_next_five">Next 5 Occurrences</string>
+    <string name="ft_no_upcoming">No upcoming dates found.</string>
+    <string name="ft_credits">Credits</string>
+    <string name="ft_select_guilds">Select Guilds</string>
+    <string name="ft_select_materials">Select Materials</string>
+
+    <!-- Codex -->
+    <string name="ft_codex_title">Codex</string>
+    <string name="ft_codex_aussie">Aussie\'s Codex</string>
+    <string name="ft_codex_yaco">Codex Yaco</string>
+
+    <!-- Gleaming -->
+    <string name="ft_overline_world_mobs">WORLD MOBS</string>
+    <string name="ft_gleaming_title">Gleaming</string>
+    <string name="ft_gleaming_empty_title">Gleaming codex coming soon</string>
+    <string name="ft_gleaming_empty_sub">Track the gleaming world mobs you\'ve encountered</string>
+
+    <!-- Guides -->
+    <string name="ft_guides_title">Guides</string>
+    <string name="ft_guides_monuments">Monuments</string>
+    <string name="ft_guides_towers">Tower heights</string>
+
+    <!-- Settings dialog -->
+    <string name="ft_settings_title">Settings</string>
+    <string name="ft_sec_ocr">OCR</string>
+    <string name="ft_sec_tracking">TRACKING</string>
+    <string name="ft_sec_notifications">NOTIFICATIONS</string>
+    <string name="ft_sec_appearance">APPEARANCE</string>
+    <string name="ft_sec_item_assessment">ITEM ASSESSMENT</string>
+    <string name="ft_sec_debug">DEBUG</string>
+    <string name="ft_scan_interval">Scan interval (ms)</string>
+    <string name="ft_high_quality_ocr">High quality OCR</string>
+    <string name="ft_high_quality_ocr_desc">Disables image downscaling. May reduce performance on low-end devices</string>
+    <string name="ft_legacy_ocr">Use legacy OCR algorithm</string>
+    <string name="ft_experimental_ocr">Experimental OCR mode</string>
+    <string name="ft_experimental_ocr_desc">Reads rewards with PaddleOCR (same engine as item assess) on the whole screen. Overrides the legacy OCR setting. Uses more CPU/RAM.</string>
+    <string name="ft_anguish_version">Anguish version</string>
+    <string name="ft_notify_materials">Show notification when material is available?</string>
+    <string name="ft_notify_time">Notification time</string>
+    <string name="ft_aura">Selected materials aura</string>
+    <string name="ft_assess_db">Assess database URL</string>
+    <string name="ft_assess_db_hint">local or URL to items.json</string>
+    <string name="ft_share_logs">Share debug logs</string>
+    <string name="ft_share_logs_chooser">Share Fight Tracker Logs</string>
+    <string name="ft_ui_scale">Interface scaling</string>
+    <string name="ft_ui_scale_desc">Applied after saving (the screen restarts)</string>
+    <string name="ft_ui_scale_value">%1$d%%</string>
+</resources>

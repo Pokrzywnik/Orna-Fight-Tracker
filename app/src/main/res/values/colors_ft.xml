@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ft_page">#08090C</color>
+    <color name="ft_bg">#0E1014</color>
+    <color name="ft_card">#171B22</color>
+    <color name="ft_line">#232834</color>
+    <color name="ft_line2">#2A3040</color>
+    <color name="ft_nested">#12151B</color>
+    <color name="ft_nav">#12151B</color>
+    <color name="ft_chip">#232834</color>
+    <color name="ft_text">#EDEFF3</color>
+    <color name="ft_muted">#9AA3B2</color>
+    <color name="ft_accent">#F2B544</color>
+    <color name="ft_accent_16">#29F2B544</color>
+    <color name="ft_accent_50">#80F2B544</color>
+    <color name="ft_on_accent">#0E1014</color>
+    <color name="ft_ok">#4ADE80</color>
+    <color name="ft_red">#C62828</color>
+    <color name="ft_red_text">#EF6B6B</color>
+    <color name="ft_gold">#F2B544</color>
+    <color name="ft_orns">#5EC8F2</color>
+    <color name="ft_exp">#B58CFF</color>
+    <color name="ft_shards">#7DE0B0</color>
+</resources>

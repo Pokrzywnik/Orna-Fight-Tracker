@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ft_gleaming_progress">%1$d/%2$d</string>
+    <string name="ft_gleaming_header">TIER %1$d</string>
+    <string name="ft_gleaming_chip_all">All  %1$d/%2$d</string>
+    <string name="ft_gleaming_chip_tier">T%1$d  %2$d/%3$d</string>
+    <string name="ft_gleaming_unmark_title">Remove from gleaming?</string>
+    <string name="ft_gleaming_unmark_message">%1$s will be hidden again.</string>
+    <string name="ft_gleaming_unmark">Remove</string>
+</resources>

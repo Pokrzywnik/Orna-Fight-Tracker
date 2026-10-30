@@ -105,8 +105,11 @@ class PaddleOcrRecognizer(
                 it.readBytes()
             }
 
-        val sessionOptions =
-            OrtSession.SessionOptions()
+        val sessionOptions = OrtSession.SessionOptions().apply {
+            setIntraOpNumThreads(2)  // try 4, or the number of big cores on your phone
+            setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
+            addXnnpack(mapOf("intra_op_num_threads" to "2"))
+        }
 
         ortSession =
             ortEnvironment.createSession(

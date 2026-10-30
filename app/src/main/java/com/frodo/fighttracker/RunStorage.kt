@@ -37,6 +37,11 @@ object RunStorage {
         obj.put("exp", run.exp)
         obj.put("shards", run.shards)
 
+        // optional - old runs simply do not have it
+        if (!run.type.isNullOrBlank()) {
+            obj.put("type", run.type)
+        }
+
         val proofsObj = JSONObject()
 
         for ((id, count) in run.proofs) {
@@ -98,17 +103,25 @@ object RunStorage {
                 }
             }
 
+            // optString would turn a missing / null value into "" or "null"
+            val type =
+                if (obj.has("type") && !obj.isNull("type"))
+                    obj.optString("type", "").ifBlank { null }
+                else
+                    null
+
             list.add(
                 RunRecord(
-                    obj.getString("runid"),
-                    obj.getString("date"),
-                    obj.getString("duration"),
-                    obj.getLong("gold"),
-                    obj.getLong("orns"),
-                    obj.getLong("exp"),
-                    obj.optLong("shards", 0L),
-                    obj.optString("name", ""),
-                    proofs
+                    runid = obj.getString("runid"),
+                    date = obj.getString("date"),
+                    duration = obj.getString("duration"),
+                    gold = obj.getLong("gold"),
+                    orns = obj.getLong("orns"),
+                    exp = obj.getLong("exp"),
+                    shards = obj.optLong("shards", 0L),
+                    name = obj.optString("name", ""),
+                    proofs = proofs,
+                    type = type
                 )
             )
         }
@@ -135,6 +148,40 @@ object RunStorage {
             if (obj.getString("runid") == runid) {
 
                 obj.put("name", newName)
+                break
+            }
+        }
+
+        prefs.edit()
+            .putString(KEY, array.toString())
+            .apply()
+    }
+
+    /** Sets (or clears, when [type] is null) the type of a saved run. */
+    fun setRunType(
+        context: Context,
+        runid: String,
+        type: String?
+    ) {
+
+        val prefs = context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+
+        val array = JSONArray(
+            prefs.getString(KEY, "[]")
+        )
+
+        for (i in 0 until array.length()) {
+
+            val obj = array.getJSONObject(i)
+
+            if (obj.getString("runid") == runid) {
+
+                if (type.isNullOrBlank()) {
+                    obj.remove("type")
+                } else {
+                    obj.put("type", type)
+                }
+
                 break
             }
         }

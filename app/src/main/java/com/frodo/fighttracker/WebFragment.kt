@@ -2,18 +2,16 @@ package com.frodo.fighttracker
 
 import android.annotation.SuppressLint
 import android.os.Bundle
-import android.view.GestureDetector
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.WebSettings
+import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.OnBackPressedCallback
 import androidx.fragment.app.Fragment
 import com.frodo.fighttracker.databinding.FragmentWebBinding
-import kotlin.math.abs
 
 class WebFragment : Fragment() {
 
@@ -21,6 +19,13 @@ class WebFragment : Fragment() {
     private val binding get() = _binding!!
 
     private var url: String = ""
+
+    /**
+     * Enabled ONLY while this page is actually on screen AND the WebView
+     * has history, so the back button goes back inside the page first
+     * and otherwise falls through to the activity.
+     */
+    private var backCallback: OnBackPressedCallback? = null
 
     companion object {
         fun newInstance(url: String): WebFragment {
@@ -37,7 +42,7 @@ class WebFragment : Fragment() {
         url = arguments?.getString("url") ?: ""
     }
 
-    @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
+    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -46,25 +51,33 @@ class WebFragment : Fragment() {
         // 1. INFLATE BINDING FIRST before touching any view references
         _binding = FragmentWebBinding.inflate(inflater, container, false)
 
-        // 2. Setup Back Press Handling
+        // 2. Setup Back Press Handling (visibility gated, see refreshBackCallback)
+        val callback = object : OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                if (_binding != null && binding.webView.canGoBack()) {
+                    binding.webView.goBack()
+                }
+                refreshBackCallback()
+            }
+        }
+
+        backCallback = callback
+
         requireActivity()
             .onBackPressedDispatcher
-            .addCallback(
-                viewLifecycleOwner,
-                object : OnBackPressedCallback(true) {
-                    override fun handleOnBackPressed() {
-                        if (_binding != null && binding.webView.canGoBack()) {
-                            binding.webView.goBack()
-                        } else {
-                            isEnabled = false
-                            requireActivity().onBackPressedDispatcher.onBackPressed()
-                        }
-                    }
-                }
-            )
+            .addCallback(viewLifecycleOwner, callback)
 
         // 3. Configure WebView
         binding.webView.webViewClient = object : WebViewClient() {
+
+            override fun doUpdateVisitedHistory(
+                view: WebView?,
+                url: String?,
+                isReload: Boolean
+            ) {
+                super.doUpdateVisitedHistory(view, url, isReload)
+                refreshBackCallback()
+            }
 
             override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
                 super.onPageFinished(view, url)
@@ -73,13 +86,13 @@ class WebFragment : Fragment() {
                     view?.evaluateJavascript(
                         """
                 (function () {
-                
+
                     if (window.ftInjected) return;
                     window.ftInjected = true;
-                
+
                     // Main page spacer
                     if (!document.getElementById('ft-style')) {
-                
+
                         const style = document.createElement('style');
                         style.id = 'ft-style';
                         style.innerHTML = `
@@ -87,7 +100,7 @@ class WebFragment : Fragment() {
                                 padding-bottom: 70px !important;
                                 box-sizing: border-box !important;
                             }
-                
+
                             /* Any fixed bottom drawer / popup */
                             div.fixed.bottom-0,
                             div[class*="fixed"][class*="bottom-0"] {
@@ -95,49 +108,49 @@ class WebFragment : Fragment() {
                                 box-sizing: border-box !important;
                             }
                         `;
-                
+
                         document.head.appendChild(style);
                     }
-                
+
                     if (!document.getElementById('ft-spacer')) {
-                
+
                         const spacer = document.createElement('div');
                         spacer.id = 'ft-spacer';
                         spacer.style.width = '100%';
                         spacer.style.height = '70px';
                         spacer.style.pointerEvents = 'none';
-                
+
                         document.body.appendChild(spacer);
                     }
-                
+
                     function fixPopups() {
-                
+
                         document.querySelectorAll('div.fixed.bottom-0').forEach(function(el){
-                
+
                             if (el.dataset.ftDone) return;
-                
+
                             el.dataset.ftDone = "1";
-                
+
                             el.style.paddingBottom = "100px";
                             el.style.boxSizing = "border-box";
-                
+
                             const spacer = document.createElement("div");
                             spacer.style.height = "90px";
                             spacer.style.flexShrink = "0";
-                
+
                             el.appendChild(spacer);
                         });
                     }
-                
+
                     fixPopups();
-                
+
                     new MutationObserver(function() {
                         fixPopups();
                     }).observe(document.body, {
                         childList: true,
                         subtree: true
                     });
-                
+
                 })();
                 """.trimIndent(),
                         null
@@ -159,66 +172,9 @@ class WebFragment : Fragment() {
             cacheMode = WebSettings.LOAD_DEFAULT
         }
 
-        // 4. Setup Fling & Drag Gesture Detection
-        val gestureDetector = GestureDetector(
-            requireContext(),
-            object : GestureDetector.SimpleOnGestureListener() {
-                private val SWIPE_THRESHOLD_VELOCITY = 1200 // Velocity in px/s (lower = easier to trigger)
-                private val SWIPE_MIN_DISTANCE = 80         // Min distance in px
-
-                override fun onFling(
-                    e1: MotionEvent?,
-                    e2: MotionEvent,
-                    velocityX: Float,
-                    velocityY: Float
-                ): Boolean {
-                    if (e1 == null) return false
-
-                    val diffX = e2.x - e1.x
-                    val diffY = e2.y - e1.y
-
-                    // Ensure the swipe is primarily horizontal and fast enough
-                    if (abs(diffX) > abs(diffY) &&
-                        abs(diffX) > SWIPE_MIN_DISTANCE &&
-                        abs(velocityX) > SWIPE_THRESHOLD_VELOCITY
-                    ) {
-                        val viewPager = activity?.findViewById<androidx.viewpager2.widget.ViewPager2>(R.id.viewPager)
-                        if (viewPager != null) {
-                            if (diffX < 0) {
-                                // Finger moved Right -> Left (Swipe Next Tab)
-                                if (viewPager.currentItem < (viewPager.adapter?.itemCount ?: 0) - 1) {
-                                    viewPager.setCurrentItem(viewPager.currentItem + 1, true)
-                                    return true
-                                }
-                            } else {
-                                // Finger moved Left -> Right (Swipe Previous Tab)
-                                if (viewPager.currentItem > 0) {
-                                    viewPager.setCurrentItem(viewPager.currentItem - 1, true)
-                                    return true
-                                }
-                            }
-                        }
-                    }
-                    return false
-                }
-            }
-        )
-
-        binding.webView.setOnTouchListener { v, event ->
-            gestureDetector.onTouchEvent(event)
-
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    v.parent?.requestDisallowInterceptTouchEvent(true)
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    v.parent?.requestDisallowInterceptTouchEvent(false)
-                }
-            }
-            false
-        }
-
-        // 5. Configure Cookies & Load URL
+        // 4. Configure Cookies & Load URL
+        // (Tab swiping was removed with the bottom navigation, so the old
+        //  fling / touch interception for the ViewPager is not needed.)
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
@@ -232,6 +188,45 @@ class WebFragment : Fragment() {
         return binding.root
     }
 
+    /** Resumed, not hidden, and no hidden parent fragment. */
+    private fun isShownToUser(): Boolean {
+
+        if (!isResumed || isHidden) return false
+
+        var parent = parentFragment
+
+        while (parent != null) {
+            if (parent.isHidden) return false
+            parent = parent.parentFragment
+        }
+
+        return true
+    }
+
+    /** Called whenever visibility or the WebView history may have changed. */
+    fun refreshBackCallback() {
+
+        val b = _binding ?: return
+
+        backCallback?.isEnabled = isShownToUser() && b.webView.canGoBack()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshBackCallback()
+    }
+
+    override fun onPause() {
+        // never keep swallowing back presses while another page is shown
+        backCallback?.isEnabled = false
+        super.onPause()
+    }
+
+    override fun onHiddenChanged(hidden: Boolean) {
+        super.onHiddenChanged(hidden)
+        refreshBackCallback()
+    }
+
     fun reloadUrl(newUrl: String) {
         url = newUrl
         if (_binding != null) {
@@ -241,6 +236,7 @@ class WebFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        backCallback = null
         _binding = null
     }
 }
