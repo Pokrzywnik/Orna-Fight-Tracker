@@ -245,10 +245,12 @@ class MaterialsFragment : Fragment() {
     private fun createHeaderAction(
         iconRes: Int,
         description: String,
+        viewId: Int = View.NO_ID,
         onClick: () -> Unit
     ): View {
 
         return ImageButton(requireContext()).apply {
+            id = viewId
 
             layoutParams = LinearLayout.LayoutParams(dp(40), dp(40)).apply {
                 marginStart = dp(8)
@@ -306,7 +308,8 @@ class MaterialsFragment : Fragment() {
         row.addView(
             createHeaderAction(
                 R.drawable.ic_calendar_month,
-                getString(R.string.ft_calendar)
+                getString(R.string.ft_calendar),
+                R.id.tutorial_material_calendar
             ) {
                 showMaterialCalendar()
             }
@@ -315,7 +318,8 @@ class MaterialsFragment : Fragment() {
         row.addView(
             createHeaderAction(
                 R.drawable.ic_explore,
-                getString(R.string.ft_guilds)
+                getString(R.string.ft_guilds),
+                R.id.tutorial_material_guilds
             ) {
                 showGuildSelector()
             }
@@ -324,7 +328,8 @@ class MaterialsFragment : Fragment() {
         row.addView(
             createHeaderAction(
                 R.drawable.ic_checklist,
-                getString(R.string.ft_materials_button)
+                getString(R.string.ft_materials_button),
+                R.id.tutorial_material_watchlist
             ) {
 
                 val allEntries = mutableListOf<MaterialEntry>()

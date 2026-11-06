@@ -1,17 +1,19 @@
 package com.frodo.fighttracker
 
 import android.app.Service
+import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
-import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.WindowManager
+import android.provider.Settings
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -22,8 +24,17 @@ import coil.load
 
 class OverlayService : Service() {
 
+    companion object {
+        var isRunning = false
+            private set
+    }
+
     private lateinit var windowManager: WindowManager
     private lateinit var overlayView: android.view.View
+    private lateinit var overlayContext: Context
+    private lateinit var windowParams: WindowManager.LayoutParams
+    private var appliedScale = 100
+    private var viewAdded = false
 
     private lateinit var ornsText: TextView
     private lateinit var xpText: TextView
@@ -56,15 +67,15 @@ class OverlayService : Service() {
      * so they stay visible (FightState is reset after saving the run).
      */
     private data class Snapshot(
-        val orns: Long,
-        val exp: Long,
-        val gold: Long,
-        val lastOrns: Long,
-        val lastExp: Long,
-        val lastGold: Long,
-        val proofs: Map<String, Long>,
-        val lastProofs: Map<String, Long>,
-        val minutes: Double
+        val orns: Long = 0L,
+        val exp: Long = 0L,
+        val gold: Long = 0L,
+        val lastOrns: Long = 0L,
+        val lastExp: Long = 0L,
+        val lastGold: Long = 0L,
+        val proofs: Map<String, Long> = emptyMap(),
+        val lastProofs: Map<String, Long> = emptyMap(),
+        val minutes: Double = 1.0 / 60.0
     )
 
     private var frozenSnapshot: Snapshot? = null
@@ -112,8 +123,8 @@ class OverlayService : Service() {
                 frozenSnapshot = null
                 liveSnapshot()
             } else {
-                // idle: show frozen values of the last run (if any)
-                frozenSnapshot ?: return
+                // Render the configured rows even before the first session.
+                frozenSnapshot ?: Snapshot()
             }
 
         when (displayMode) {
@@ -187,33 +198,52 @@ class OverlayService : Service() {
             proofsContainer.removeAllViews()
             proofViews.clear()
 
-            for (p in proofs) {
-
-                val row = LinearLayout(this).apply {
+            for (pair in proofs.chunked(2)) {
+                val row = LinearLayout(overlayContext).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
                     setPadding(0, dp(8), 0, 0)
                 }
-
-                val icon = ImageView(this).apply {
-                    layoutParams = LinearLayout.LayoutParams(dp(22), dp(22))
-                    scaleType = ImageView.ScaleType.FIT_CENTER
-                    load(p.iconUrl) {
-                        crossfade(false)
-                        error(android.R.drawable.ic_menu_help)
-                    }
-                }
-
-                val tv = TextView(this).apply {
-                    setTextColor(Color.WHITE)
-                    textSize = 16f
-                    setPadding(dp(8), 0, 0, 0)
-                }
-
-                row.addView(icon)
-                row.addView(tv)
                 proofsContainer.addView(row)
-                proofViews[p.id] = tv
+
+                for (p in pair) {
+                    val cell = LinearLayout(overlayContext).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                        minimumWidth = dp(86)
+                        layoutParams = LinearLayout.LayoutParams(0,
+                            LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                        if (row.childCount > 0) setPadding(dp(8), 0, 0, 0)
+                        contentDescription = p.label
+                    }
+
+                    val icon = ImageView(overlayContext).apply {
+                        layoutParams = LinearLayout.LayoutParams(dp(22), dp(22))
+                        scaleType = ImageView.ScaleType.FIT_CENTER
+                        load(p.iconUrl) {
+                            crossfade(false)
+                            // Overlay windows use a software canvas, including
+                            // newly inflated views after a scale change.
+                            allowHardware(false)
+                            error(android.R.drawable.ic_menu_help)
+                        }
+                    }
+
+                    val tv = TextView(overlayContext).apply {
+                        setTextColor(Color.WHITE)
+                        textSize = 16f
+                        setSingleLine()
+                        setPadding(dp(4), 0, 0, 0)
+                    }
+
+                    cell.addView(icon)
+                    cell.addView(tv)
+                    row.addView(cell)
+                    proofViews[p.id] = tv
+                }
+                if (pair.size == 1) {
+                    row.addView(View(overlayContext), LinearLayout.LayoutParams(0, 0, 1f))
+                }
             }
 
             proofsContainer.visibility =
@@ -224,17 +254,17 @@ class OverlayService : Service() {
 
             tv.text = when (displayMode) {
 
-                0 -> formatShort(s.proofs[id] ?: 0L)
+                0 -> (s.proofs[id] ?: 0L).toString()
 
                 1 -> String.format("%.1f/m", (s.proofs[id] ?: 0L) / s.minutes)
 
-                else -> "+${formatShort(s.lastProofs[id] ?: 0L)}"
+                else -> "+${s.lastProofs[id] ?: 0L}"
             }
         }
     }
 
     private fun dp(value: Int): Int =
-        (value * resources.displayMetrics.density).toInt()
+        (value * overlayContext.resources.displayMetrics.density).toInt()
 
     private fun buttonBackground(color: Int): GradientDrawable {
 
@@ -306,9 +336,37 @@ class OverlayService : Service() {
     override fun onCreate() {
 
         super.onCreate()
+        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        windowParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 100
+            y = 420
+        }
+        createOverlay()
+    }
+
+    private fun createOverlay() {
+        if (!Settings.canDrawOverlays(this)) {
+            stopSelf()
+            return
+        }
+
+        appliedScale = SettingsStore.getOverlayScale(this)
+        val config = Configuration(resources.configuration)
+        config.densityDpi = (config.densityDpi * appliedScale / 100f).toInt()
+        overlayContext = createConfigurationContext(config)
+        proofViews.clear()
+        proofsSignature = null
+        lastRunningState = null
         Log.d("OverlayService", "===== onCreate =====")
 
-        overlayView = LayoutInflater.from(this)
+        overlayView = LayoutInflater.from(this).cloneInContext(overlayContext)
             .inflate(R.layout.overlay_tracker, null)
 
         Log.d("OverlayService", "Layout inflated")
@@ -347,32 +405,32 @@ class OverlayService : Service() {
             stopSelf()
         }
 
-        val params = WindowManager.LayoutParams(
-
-            WindowManager.LayoutParams.WRAP_CONTENT,
-
-            WindowManager.LayoutParams.WRAP_CONTENT,
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else
-                WindowManager.LayoutParams.TYPE_PHONE,
-
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-
-            PixelFormat.TRANSLUCENT
-        )
-
-        params.gravity = Gravity.TOP or Gravity.START
-
-        params.x = 100
-        params.y = 420
-
-        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-
+        val params = windowParams
         Log.d("OverlayService", "About to add overlay")
-        windowManager.addView(overlayView, params)
+        try {
+            windowManager.addView(overlayView, params)
+            viewAdded = true
+            isRunning = true
+        } catch (e: SecurityException) {
+            Log.w("OverlayService", "Overlay permission unavailable", e)
+            stopSelf()
+            return
+        } catch (e: WindowManager.BadTokenException) {
+            Log.w("OverlayService", "Could not attach rewards overlay", e)
+            stopSelf()
+            return
+        }
         Log.d("OverlayService", "Overlay successfully added")
+
+        val attachedView = overlayView
+        attachedView.post {
+            if (viewAdded && overlayView === attachedView) {
+                val metrics = resources.displayMetrics
+                params.x = params.x.coerceIn(0, (metrics.widthPixels - attachedView.width).coerceAtLeast(0))
+                params.y = params.y.coerceIn(0, (metrics.heightPixels - attachedView.height).coerceAtLeast(0))
+                windowManager.updateViewLayout(attachedView, params)
+            }
+        }
 
         // Drag + tap-to-cycle on the whole overlay.
         // The buttons are clickable children, so they get their touches first.
@@ -440,10 +498,19 @@ class OverlayService : Service() {
      */
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
 
-        frozenSnapshot = null
+        if (!viewAdded) return START_NOT_STICKY
+        if (appliedScale != SettingsStore.getOverlayScale(this)) {
+            handler.removeCallbacks(updater)
+            windowManager.removeView(overlayView)
+            viewAdded = false
+            isRunning = false
+            createOverlay()
+            if (!viewAdded) return START_NOT_STICKY
+        }
+        if (TrackingController.isRunning) frozenSnapshot = null
         render()
 
-        return super.onStartCommand(intent, flags, startId)
+        return START_NOT_STICKY
     }
 
     override fun onDestroy() {
@@ -452,8 +519,11 @@ class OverlayService : Service() {
 
         handler.removeCallbacks(updater)
 
-        if (::overlayView.isInitialized)
+        isRunning = false
+        if (viewAdded) {
             windowManager.removeView(overlayView)
+            viewAdded = false
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

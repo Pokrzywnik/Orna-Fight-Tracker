@@ -1,6 +1,7 @@
 package com.frodo.fighttracker
 
 import android.os.Bundle
+import android.os.Parcelable
 import android.view.LayoutInflater
 import android.view.View
 import androidx.fragment.app.Fragment
@@ -27,6 +28,8 @@ class GleamingFragment : Fragment(R.layout.fragment_gleaming) {
     private var mobs: List<GleamingMob> = emptyList()
     private var tiers: List<Int> = emptyList()
     private var selectedTier = TIER_ALL
+    private var tutorialPreview = false
+    private var collectionScrollState: Parcelable? = null
 
     /** tier (or TIER_ALL) -> its chip, so counters can be refreshed in place */
     private val chips = mutableMapOf<Int, Chip>()
@@ -38,6 +41,7 @@ class GleamingFragment : Fragment(R.layout.fragment_gleaming) {
         _binding = b
 
         val ctx = requireContext()
+        tutorialPreview = (activity as? MainActivity)?.isGleamingTutorialPreview == true
 
         GleamingStore.load(ctx)
         mobs = GleamingStore.mobs(ctx)
@@ -60,6 +64,15 @@ class GleamingFragment : Fragment(R.layout.fragment_gleaming) {
         refresh()
     }
 
+    fun setTutorialPreview(enabled: Boolean) {
+        if (tutorialPreview == enabled) return
+        if (enabled && collectionScrollState == null) {
+            collectionScrollState = _binding?.gleamingList?.layoutManager?.onSaveInstanceState()
+        }
+        tutorialPreview = enabled
+        refresh()
+    }
+
     private fun buildChips(b: FragmentGleamingBinding) {
 
         chips.clear()
@@ -73,13 +86,14 @@ class GleamingFragment : Fragment(R.layout.fragment_gleaming) {
 
             chip.id = View.generateViewId()
             chip.tag = tier
-            chip.isChecked = tier == selectedTier
+            chip.isChecked = tier == if (tutorialPreview) TIER_ALL else selectedTier
 
             chips[tier] = chip
             b.tierChips.addView(chip)
         }
 
         b.tierChips.setOnCheckedStateChangeListener { group, checkedIds ->
+            if (tutorialPreview) return@setOnCheckedStateChangeListener
 
             val id = checkedIds.firstOrNull() ?: return@setOnCheckedStateChangeListener
             val tier = group.findViewById<Chip>(id)?.tag as? Int
@@ -100,7 +114,11 @@ class GleamingFragment : Fragment(R.layout.fragment_gleaming) {
         val ctx = requireContext()
 
         val byTier = mobs.groupBy { it.tier }
-        val discovered = GleamingStore.discovered
+        val discovered = GleamingTutorialPreview.discoveries(
+            mobs, GleamingStore.discovered, tutorialPreview
+        )
+        val displayedTier = if (tutorialPreview) TIER_ALL else selectedTier
+        chips[displayedTier]?.let { b.tierChips.check(it.id) }
 
         fun found(list: List<GleamingMob>) = list.count { it.id in discovered }
 
@@ -119,7 +137,7 @@ class GleamingFragment : Fragment(R.layout.fragment_gleaming) {
         }
 
         // grid rows
-        val shownTiers = if (selectedTier == TIER_ALL) tiers else listOf(selectedTier)
+        val shownTiers = if (displayedTier == TIER_ALL) tiers else listOf(displayedTier)
 
         val rows = buildList<GleamingRow> {
             for (tier in shownTiers) {
@@ -129,10 +147,21 @@ class GleamingFragment : Fragment(R.layout.fragment_gleaming) {
             }
         }
 
-        adapter.submitList(rows)
+        val isPreview = tutorialPreview
+        adapter.submitList(rows) {
+            if (_binding === b && tutorialPreview == isPreview) {
+                if (isPreview) {
+                    b.gleamingList.scrollToPosition(0)
+                } else {
+                    collectionScrollState?.let { b.gleamingList.layoutManager?.onRestoreInstanceState(it) }
+                    collectionScrollState = null
+                }
+            }
+        }
     }
 
     private fun onMobClick(mob: GleamingMob, discovered: Boolean) {
+        if (tutorialPreview) return
 
         val ctx = requireContext()
 
@@ -157,6 +186,7 @@ class GleamingFragment : Fragment(R.layout.fragment_gleaming) {
     override fun onDestroyView() {
         super.onDestroyView()
         chips.clear()
+        collectionScrollState = null
         _binding = null
     }
 }

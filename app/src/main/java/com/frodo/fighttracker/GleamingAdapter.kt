@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
+import coil.size.Size
 import com.frodo.fighttracker.databinding.ItemGleamingHeaderBinding
 import com.frodo.fighttracker.databinding.ItemGleamingMobBinding
 import android.view.Gravity
@@ -133,7 +134,12 @@ class GleamingAdapter(
                 // filtering keeps pixel-art sprites sharp
                 b.mobSprite.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
 
-                b.mobSprite.load(mob.iconUrl) {
+                b.mobSprite.load(mob.iconUrl, GleamingSpriteCache.imageLoader(b.root.context)) {
+                    // Keep the source pixels intact. Decode-time resizing can
+                    // smooth pixel art before ImageView's filtering is disabled.
+                    size(Size.ORIGINAL)
+                    memoryCacheKey("gleaming-original:${mob.iconUrl}")
+                    diskCacheKey(mob.iconUrl)
                     crossfade(false)
                     allowHardware(false)
                     listener(

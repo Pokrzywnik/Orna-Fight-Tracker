@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- All first-start tutorial text lives here. Step order matches the numbered screenshots. -->
+    <string name="tutorial_progress">%1$d / %2$d</string>
+    <string name="tutorial_wait">Take a moment to read…</string>
+    <string name="tutorial_next">Tap anywhere to continue</string>
+    <string name="tutorial_finish">Tap anywhere to finish</string>
+    <string name="tutorial_reset">Reset tutorial</string>
+
+    <!-- 1: both overlay buttons -->
+    <string name="tutorial_overlays_title">Your floating overlays</string>
+    <string name="tutorial_overlays_description">Rewards Overlay shows your session totals above the game. Assess Overlay opens the floating item assessment control. Use these buttons to show or hide them.</string>
+
+    <!-- 2: settings -->
+    <string name="tutorial_settings_title">Make it yours</string>
+    <string name="tutorial_settings_description">Adjust OCR scanning, interface and rewards overlay sizes, material notifications, and other preferences here.</string>
+
+    <!-- 3: tracking options row -->
+    <string name="tutorial_tracking_title">Choose what to track</string>
+    <string name="tutorial_tracking_description">Choose currencies, proofs, and keys to track. You can also choose which counters appear in the rewards overlay.</string>
+
+    <!-- 4: Guides tab -->
+    <string name="tutorial_guides_title">Guides</string>
+    <string name="tutorial_guides_description">Check monument rewards and tower heights using the built-in community reference pages.</string>
+
+    <!-- 5: Gleaming tab -->
+    <string name="tutorial_gleaming_title">Your Gleaming collection</string>
+    <string name="tutorial_gleaming_description">Browse monsters by tier and tap the ones you have found gleaming. Silhouettes turn into full sprites as you mark your discoveries.</string>
+
+    <!-- 6: Codex tab -->
+    <string name="tutorial_codex_title">Look things up</string>
+    <string name="tutorial_codex_description">Browse Aussie Codex or YACO without leaving FightTracker. Switch between the two sources inside the Codex tab.</string>
+
+    <!-- 7: Materials tab; the walkthrough switches to this tab -->
+    <string name="tutorial_materials_title">Plan your materials</string>
+    <string name="tutorial_materials_description">This tab shows materials available today and tomorrow. Let us look at the three buttons that help you plan your farming.</string>
+
+    <!-- 8: Materials calendar -->
+    <string name="tutorial_calendar_title">Find upcoming dates</string>
+    <string name="tutorial_calendar_description">Open the material calendar, choose a material, and see its next available dates across your enabled guilds.</string>
+
+    <!-- 9: guild selector -->
+    <string name="tutorial_guilds_title">Choose your guilds</string>
+    <string name="tutorial_guilds_description">Choose which guild rotations to include. The material forecast and availability checks will use your selection.</string>
+
+    <!-- 10: tracked materials selector -->
+    <string name="tutorial_watchlist_title">Watch the materials you need</string>
+    <string name="tutorial_watchlist_description">Select materials to highlight with an aura. Enable material notifications in Settings to receive availability reminders at set hour.</string>
+</resources>

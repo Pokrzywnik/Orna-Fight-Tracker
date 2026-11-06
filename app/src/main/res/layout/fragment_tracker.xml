@@ -44,13 +44,52 @@
             </LinearLayout>
 
             <LinearLayout
-                android:id="@+id/overlayToggle"
+                android:id="@+id/rewardsOverlayToggle"
                 android:layout_width="wrap_content"
                 android:layout_height="40dp"
                 android:background="@drawable/bg_pill"
                 android:clickable="true"
                 android:focusable="true"
-                android:gravity="center_vertical"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="14dp">
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_ft_tracker"
+                    app:tint="@color/ft_text" />
+
+                <TextView
+                    style="@style/TextAppearance.FT.Label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                    android:maxLines="1"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeMaxTextSize="12sp"
+                    android:text="@string/ft_rewards_overlay" />
+
+                <View
+                    android:id="@+id/rewardsOverlayDot"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_dot_off" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/overlayToggle"
+                android:layout_width="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_pill"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
                 android:orientation="horizontal"
                 android:paddingStart="12dp"
                 android:paddingEnd="14dp">
@@ -66,7 +105,11 @@
                     style="@style/TextAppearance.FT.Label"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
+                        android:layout_marginStart="6dp"
+                    android:maxLines="1"
+                    android:autoSizeTextType="uniform"
+                    android:autoSizeMinTextSize="9sp"
+                    android:autoSizeMaxTextSize="12sp"
                     android:text="@string/ft_overlay" />
 
                 <View

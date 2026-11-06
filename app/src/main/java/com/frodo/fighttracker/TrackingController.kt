@@ -9,21 +9,37 @@ import java.util.Locale
 object TrackingController {
 
     var isRunning = false
+        private set
+    var isStarting = false
+        private set
+    var historyVersion = 0L
+        private set
     var startTime = 0L
+        private set
+
+    fun requestStart(): Boolean {
+        if (isRunning || isStarting) return false
+        isStarting = true
+        return true
+    }
+
+    fun cancelStart() {
+        isStarting = false
+        if (!isRunning) recording = 0
+    }
 
     fun start() {
+        if (isRunning) return
+        isStarting = false
         isRunning = true
         startTime = System.currentTimeMillis()
+        FightState.startTime = startTime
+        recording = 1
         FightState.ornsConfirmationThreshold = 3_000_000L
     }
 
-    fun stop(): Long {
-        isRunning = false
-        return System.currentTimeMillis() - startTime
-    }
-
     /**
-     * Stops tracking, saves the run to history and resets FightState.
+     * Stops tracking, saves nonempty runs to history and resets FightState.
      * Can be called from anywhere (MainActivity, overlay, ...).
      *
      * closeOverlay = true  -> also stops the stats overlay
@@ -32,12 +48,26 @@ object TrackingController {
     fun stopAndSave(context: Context, closeOverlay: Boolean) {
 
         val app = context.applicationContext
-
+        // Ignore late OCR callbacks before taking the final snapshot.
+        FightTrackerService.instance?.prepareToStop()
+        finishSession(app, closeOverlay)
         app.stopService(Intent(app, FightTrackerService::class.java))
+    }
+
+    /** Also used when Android destroys the capture service. Safe to call twice. */
+    fun finishSession(context: Context, closeOverlay: Boolean) {
+        val app = context.applicationContext
+        cancelStart()
 
         if (closeOverlay) {
             app.stopService(Intent(app, OverlayService::class.java))
         }
+
+        if (!isRunning) return
+        isRunning = false
+        recording = 0
+        RewardConfirmOverlayService.onResult = null
+        app.stopService(Intent(app, RewardConfirmOverlayService::class.java))
 
         val endTime = System.currentTimeMillis()
 
@@ -68,7 +98,7 @@ object TrackingController {
         // best guess of what was farmed; can be changed in the rename dialog
         val type = RunType.infer(proofs, FightState.shards)?.key
 
-        RunStorage.saveRun(
+        val saved = RunStorage.saveRun(
             app,
             RunRecord(
                 runid = runid,
@@ -90,9 +120,13 @@ object TrackingController {
         FightState.shards = 0L
         FightState.proofs.clear()
 
-        isRunning = false
-
-        // keeps the Tracker tab's STOP button in sync
-        recording = 0
+        FightState.lastGold = 0L
+        FightState.lastOrns = 0L
+        FightState.lastExp = 0L
+        FightState.lastShards = 0L
+        FightState.lastProofs = emptyMap()
+        FightState.startTime = 0L
+        startTime = 0L
+        if (saved) historyVersion++
     }
 }

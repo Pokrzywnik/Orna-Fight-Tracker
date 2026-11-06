@@ -21,4 +21,8 @@
     <color name="ft_orns">#5EC8F2</color>
     <color name="ft_exp">#B58CFF</color>
     <color name="ft_shards">#7DE0B0</color>
+    <color name="ft_settings_surface">#151C26</color>
+    <color name="ft_settings_action">#2C3D54</color>
+    <color name="ft_settings_action_secondary">#233545</color>
+    <color name="ft_settings_action_text">#D5ECFF</color>
 </resources>

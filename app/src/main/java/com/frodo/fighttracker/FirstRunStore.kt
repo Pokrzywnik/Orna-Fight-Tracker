@@ -7,7 +7,7 @@ object FirstRunStore {
     private const val PREF = "first_run_pref"
     private const val KEY = "guide_version"
 
-    private const val CURRENT_GUIDE_VERSION = 9
+    private const val CURRENT_GUIDE_VERSION = 10
 
     fun shouldShow(context: Context): Boolean {
         val shown = context
@@ -21,6 +21,13 @@ object FirstRunStore {
         context.getSharedPreferences(PREF, 0)
             .edit()
             .putInt(KEY, CURRENT_GUIDE_VERSION)
+            .apply()
+    }
+
+    fun reset(context: Context) {
+        context.getSharedPreferences(PREF, 0)
+            .edit()
+            .remove(KEY)
             .apply()
     }
 }

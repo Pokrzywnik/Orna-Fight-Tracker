@@ -32,6 +32,17 @@ import android.content.res.Configuration
 
 object SettingsStore {
 
+    private const val KEY_OVERLAY_SCALE = "overlay_scale"
+
+    fun getOverlayScale(context: Context): Int =
+        context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+            .getInt(KEY_OVERLAY_SCALE, 100).coerceIn(60, 140)
+
+    fun setOverlayScale(context: Context, value: Int) {
+        context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+            .edit().putInt(KEY_OVERLAY_SCALE, value.coerceIn(60, 140)).apply()
+    }
+
     private const val KEY_UI_SCALE = "ui_scale"
 
     /** Interface scale in percent: 60..140, step 20, default 100. */
@@ -250,11 +261,16 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var projectionManager: MediaProjectionManager
+    private var firstStartTutorial: FirstStartTutorial? = null
+    internal var isGleamingTutorialPreview = false
+        private set
 
     private val captureLauncher =
         registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
         ) { result ->
+
+            if (!TrackingController.isStarting) return@registerForActivityResult
 
             if (result.resultCode == Activity.RESULT_OK &&
                 result.data != null
@@ -266,12 +282,14 @@ class MainActivity : AppCompatActivity() {
                 intent.putExtra("resultCode", result.resultCode)
                 intent.putExtra("data", result.data)
 
-                startForegroundService(intent)
-                startService(Intent(this, OverlayService::class.java))
-
-                // tracking is really running now
-                TrackingController.isRunning = true
-                recording = 1
+                try {
+                    startForegroundService(intent)
+                } catch (e: RuntimeException) {
+                    TrackingController.cancelStart()
+                    Log.e("FightTracker", "Could not start tracker service", e)
+                }
+            } else {
+                TrackingController.cancelStart()
             }
         }
 
@@ -331,12 +349,21 @@ class MainActivity : AppCompatActivity() {
         }
 
     fun startCapture() {
+        if (!TrackingController.requestStart()) return
         OrnaLauncher.launch(this)
         Handler(Looper.getMainLooper()).postDelayed({
-
-            captureLauncher.launch(
-                projectionManager.createScreenCaptureIntent()
-            )
+            if (!TrackingController.isStarting || isFinishing || isDestroyed) {
+                TrackingController.cancelStart()
+                return@postDelayed
+            }
+            try {
+                captureLauncher.launch(
+                    projectionManager.createScreenCaptureIntent()
+                )
+            } catch (e: RuntimeException) {
+                TrackingController.cancelStart()
+                Log.e("FightTracker", "Could not request screen capture", e)
+            }
 
         }, 600)
     }
@@ -367,9 +394,6 @@ class MainActivity : AppCompatActivity() {
             ACTION_START_TRACKING -> {
 
                 if (!TrackingController.isRunning) {
-
-                    FightState.startTime = System.currentTimeMillis()
-                    FightState.ornsConfirmationThreshold = 3_000_000L
 
                     startCapture()
                 }
@@ -426,13 +450,27 @@ class MainActivity : AppCompatActivity() {
         super.attachBaseContext(newBase.createConfigurationContext(config))
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+
+        if (hasFocus) {
+            val controller = WindowCompat.getInsetsController(window, window.decorView)
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            firstStartTutorial?.resume()
+        } else {
+            firstStartTutorial?.pause()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         // transient status bar (swipe from the top edge), as before
         val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
         windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        windowInsetsController.hide(WindowInsetsCompat.Type.statusBars())
+        windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
         UpdateChecker.check(this)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -461,12 +499,6 @@ class MainActivity : AppCompatActivity() {
 
         setupInsets()
 
-        ItemDatabaseManager.initialize(this)
-
-        ItemAssessmentPipeline
-            .ItemAssessmentManager
-            .initialize(this)
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
 
             if (
@@ -491,16 +523,21 @@ class MainActivity : AppCompatActivity() {
 
         }
 
-        if (FirstRunStore.shouldShow(this)) {
-            startActivity(Intent(this, FirstRunActivity::class.java))
-        }
-
         projectionManager =
             getSystemService(
                 MEDIA_PROJECTION_SERVICE
             ) as MediaProjectionManager
 
         setupPagerAndNavigation()
+
+        // Do not interrupt a capture action opened from an existing overlay.
+        if (FirstRunStore.shouldShow(this) &&
+            !TrackingController.isRunning && !TrackingController.isStarting &&
+            (intent.action == null || intent.action == Intent.ACTION_MAIN)) {
+            firstStartTutorial = createFirstStartTutorial(
+                savedInstanceState?.getInt("first_start_tutorial_step", 0) ?: 0
+            )
+        }
 
         val openTab = intent.getIntExtra("open_tab", -1)
         if (openTab in PAGE_IDS.indices) {
@@ -521,6 +558,39 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refreshBadges()
+        binding.root.post { firstStartTutorial?.resume() }
+    }
+
+    override fun onPause() {
+        firstStartTutorial?.pause()
+        super.onPause()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        firstStartTutorial?.let {
+            outState.putInt("first_start_tutorial_step", it.currentStep)
+        }
+        super.onSaveInstanceState(outState)
+    }
+
+    override fun onDestroy() {
+        firstStartTutorial?.dispose()
+        firstStartTutorial = null
+        super.onDestroy()
+    }
+
+    private fun createFirstStartTutorial(step: Int = 0): FirstStartTutorial =
+        FirstStartTutorial(this, step, onGleamingPreviewChanged = { enabled ->
+            isGleamingTutorialPreview = enabled
+            supportFragmentManager.fragments.filterIsInstance<GleamingFragment>()
+                .forEach { it.setTutorialPreview(enabled) }
+        }) { page -> binding.viewPager.setCurrentItem(page, false) }
+
+    private fun resetTutorial() {
+        firstStartTutorial?.dispose()
+        FirstRunStore.reset(this)
+        firstStartTutorial = createFirstStartTutorial()
+        binding.root.post { firstStartTutorial?.resume() }
     }
 
     // ------------------------------------------------------------------
@@ -679,13 +749,28 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    fun toggleRewardsOverlay() {
+        if (OverlayService.isRunning) {
+            stopService(Intent(this, OverlayService::class.java))
+        } else if (!Settings.canDrawOverlays(this)) {
+            checkOverlayPermission()
+        } else {
+            startService(Intent(this, OverlayService::class.java))
+        }
+    }
+
     // ------------------------------------------------------------------
     // settings
     // ------------------------------------------------------------------
 
     fun showSettingsDialog() {
 
-        val dialogView = layoutInflater.inflate(R.layout.dialog_settings, null)
+        val settingsBuilder = MaterialAlertDialogBuilder(this, R.style.ThemeOverlay_FT_SettingsDialog)
+            .setBackground(ContextCompat.getDrawable(this, R.drawable.bg_settings_panel))
+            .setBackgroundInsetStart(UiKit.dp(this, 12))
+            .setBackgroundInsetEnd(UiKit.dp(this, 12))
+        val dialogView = layoutInflater.cloneInContext(settingsBuilder.context)
+            .inflate(R.layout.dialog_settings, null)
 
         val timePicker =
             dialogView.findViewById<TimePicker>(R.id.materialTimePicker)
@@ -801,6 +886,23 @@ class MainActivity : AppCompatActivity() {
             updateUiScaleLabel(value.toInt())
         }
 
+        val overlayScaleSlider =
+            dialogView.findViewById<com.google.android.material.slider.Slider>(R.id.overlayScaleSlider)
+        val overlayScaleLabel =
+            dialogView.findViewById<android.widget.TextView>(R.id.overlayScaleLabel)
+        val currentOverlayScale = SettingsStore.getOverlayScale(this)
+
+        fun updateOverlayScaleLabel(value: Int) {
+            overlayScaleLabel.text = getString(R.string.ft_overlay_scale) + ": " +
+                getString(R.string.ft_ui_scale_value, value)
+        }
+
+        overlayScaleSlider.value = currentOverlayScale.toFloat()
+        updateOverlayScaleLabel(currentOverlayScale)
+        overlayScaleSlider.addOnChangeListener { _, value, _ ->
+            updateOverlayScaleLabel(value.toInt())
+        }
+
         val assessDatabaseUrlInput =
             dialogView.findViewById<android.widget.EditText>(
                 R.id.assessDatabaseUrlInput
@@ -878,7 +980,7 @@ class MainActivity : AppCompatActivity() {
 
         // save settings
 
-        MaterialAlertDialogBuilder(this)
+        val settingsDialog = settingsBuilder
             .setTitle(R.string.ft_settings_title)
             .setView(dialogView)
             .setPositiveButton(R.string.ft_save) { _, _ ->
@@ -958,6 +1060,14 @@ class MainActivity : AppCompatActivity() {
                 refreshBadges()
                 val newUiScale = uiScaleSlider.value.toInt()
 
+                val newOverlayScale = overlayScaleSlider.value.toInt()
+                if (newOverlayScale != currentOverlayScale) {
+                    SettingsStore.setOverlayScale(this, newOverlayScale)
+                    if (OverlayService.isRunning) {
+                        startService(Intent(this, OverlayService::class.java))
+                    }
+                }
+
                 if (newUiScale != currentUiScale) {
                     SettingsStore.setUiScale(this, newUiScale)
                     recreate()
@@ -965,7 +1075,18 @@ class MainActivity : AppCompatActivity() {
             }
 
             .setNegativeButton(R.string.ft_cancel, null)
-            .show()
+            .create()
+
+        dialogView.findViewById<android.widget.Button>(R.id.resetTutorialButton)
+            .setOnClickListener {
+                settingsDialog.dismiss()
+                resetTutorial()
+            }
+        settingsDialog.show()
+        settingsDialog.window?.setLayout(
+            minOf(resources.displayMetrics.widthPixels, UiKit.dp(this, 640)),
+            android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+        )
     }
 
     fun checkOverlayPermission() {

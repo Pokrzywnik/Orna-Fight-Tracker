@@ -20,6 +20,9 @@
     <string name="ft_overline_tracker">FIGHT TRACKER</string>
     <string name="ft_tracker_title">Tracker</string>
     <string name="ft_overlay">Assess Overlay</string>
+    <string name="ft_rewards_overlay">Rewards Overlay</string>
+    <string name="ft_overlay_scale">Overlay scale</string>
+    <string name="ft_overlay_scale_desc">Scales the rewards overlay only. Applied after saving.</string>
     <string name="ft_tracking">TRACKING</string>
     <string name="ft_idle">IDLE</string>
     <string name="ft_start">Start</string>

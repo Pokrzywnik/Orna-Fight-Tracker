@@ -9,10 +9,13 @@ object RunStorage {
     private const val PREF = "runs"
     private const val KEY = "history"
 
+    /** Returns true when a nonempty run was added to history. */
     fun saveRun(
         context: Context,
         run: RunRecord
-    ) {
+    ): Boolean {
+        // Check before reading or writing history; all callers share this rule.
+        if (run.isEmpty) return false
 
         android.util.Log.d("RUN_HISTORY", "saveRun called")
 
@@ -67,6 +70,7 @@ object RunStorage {
             "RUN_HISTORY",
             "FINAL JSON = ${array}"
         )
+        return true
     }
 
     fun loadRuns(

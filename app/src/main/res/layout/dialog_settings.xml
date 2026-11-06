@@ -9,9 +9,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingStart="20dp"
+        android:paddingStart="16dp"
         android:paddingTop="4dp"
-        android:paddingEnd="20dp"
+        android:paddingEnd="16dp"
         android:paddingBottom="8dp">
 
         <!-- ================= OCR ================= -->
@@ -216,6 +216,30 @@
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
 			android:text="@string/ft_ui_scale_desc" />
+
+        <TextView
+            android:id="@+id/overlayScaleLabel"
+            style="@style/TextAppearance.FT.Body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/ft_overlay_scale"
+            android:textStyle="bold" />
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/overlayScaleSlider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:valueFrom="60"
+            android:valueTo="140"
+            android:stepSize="20"
+            android:value="100" />
+
+        <TextView
+            style="@style/TextAppearance.FT.Muted"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/ft_overlay_scale_desc" />
         <View
             style="@style/Widget.FT.Divider"
             android:layout_width="match_parent"
@@ -264,13 +288,24 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/shareLogsButton"
-            style="@style/Widget.Material3.Button.OutlinedButton"
+            style="@style/Widget.FT.SettingsAction"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:layout_marginBottom="8dp"
-            android:minHeight="48dp"
             android:text="@string/ft_share_logs"
-            android:textAllCaps="false" />
+            app:icon="@drawable/ic_ft_share" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/resetTutorialButton"
+            style="@style/Widget.FT.SettingsAction"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/tutorial_reset"
+            android:textColor="@color/ft_settings_action_text"
+            app:backgroundTint="@color/ft_settings_action_secondary"
+            app:iconTint="@color/ft_settings_action_text"
+            app:icon="@drawable/ic_ft_undo" />
     </LinearLayout>
 </ScrollView>

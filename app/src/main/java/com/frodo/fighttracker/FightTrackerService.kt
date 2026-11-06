@@ -1,6 +1,7 @@
 package com.frodo.fighttracker
 
 import android.app.Notification
+import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -145,6 +146,23 @@ class FightTrackerService : Service() {
         flags: Int,
         startId: Int
     ): Int {
+        if (intent?.action == "STOP") {
+            TrackingController.stopAndSave(this, closeOverlay = true)
+            return START_NOT_STICKY
+        }
+
+        // A capture session always needs fresh user consent. Do not create a
+        // second VirtualDisplay if a duplicate start reaches this service.
+        if (mediaProjection != null) return START_NOT_STICKY
+
+        val resultCode = intent?.getIntExtra("resultCode", -1) ?: -1
+        val data = intent?.getParcelableExtra<Intent>("data")
+        if (resultCode != Activity.RESULT_OK || data == null || !TrackingController.isStarting) {
+            TrackingController.cancelStart()
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         TrackerLogger.startNewSession(this)
         createNotificationChannel()
 
@@ -180,63 +198,63 @@ class FightTrackerService : Service() {
                 )
                 .build()
 
-        startForeground(1, notification)
-
-        if (intent?.action == "STOP") {
-            stopSelf()
-            return START_NOT_STICKY
-        }
-
-        val resultCode =
-            intent?.getIntExtra("resultCode", -1) ?: -1
-
-        val data =
-            intent?.getParcelableExtra<Intent>("data")
-
         val projectionManager =
             getSystemService(
                 MEDIA_PROJECTION_SERVICE
             ) as MediaProjectionManager
 
-        mediaProjection =
-            projectionManager.getMediaProjection(resultCode, data!!)
+        try {
+            startForeground(1, notification)
+            mediaProjection =
+                projectionManager.getMediaProjection(resultCode, data)
+                    ?: error("MediaProjection was not created")
 
-        mediaProjection?.registerCallback(
-            object : MediaProjection.Callback() {
-                override fun onStop() {
-                    stopSelf()
-                }
-            },
-            Handler(Looper.getMainLooper())
-        )
-        startTime = System.currentTimeMillis()
-
-        // Load Paddle models in the background so the first scan is not delayed
-        if (SettingsStore.getExperimentalOcr(this)) {
-
-            try {
-
-                paddleExecutor.execute {
-
-                    try {
-
-                        RewardOcrEngine.warmUp(applicationContext)
-
-                    } catch (e: Exception) {
-
-                        Log.e("OCR_RAW", "Paddle warm-up failed", e)
+            mediaProjection?.registerCallback(
+                object : MediaProjection.Callback() {
+                    override fun onStop() {
+                        if (!destroyed) {
+                            TrackingController.stopAndSave(
+                                this@FightTrackerService,
+                                closeOverlay = true
+                            )
+                        }
                     }
+                },
+                Handler(Looper.getMainLooper())
+            )
+            // Load Paddle models in the background so the first scan is not delayed
+            if (SettingsStore.getExperimentalOcr(this)) {
+
+                try {
+
+                    paddleExecutor.execute {
+
+                        try {
+
+                            RewardOcrEngine.warmUp(applicationContext)
+
+                        } catch (e: Exception) {
+
+                            Log.e("OCR_RAW", "Paddle warm-up failed", e)
+                        }
+                    }
+
+                } catch (e: Exception) {
+
+                    Log.e("OCR_RAW", "Could not schedule Paddle warm-up", e)
                 }
-
-            } catch (e: Exception) {
-
-                Log.e("OCR_RAW", "Could not schedule Paddle warm-up", e)
             }
+
+            startCapture()
+            TrackingController.start()
+            startTime = FightState.startTime
+            startService(Intent(this, OverlayService::class.java))
+        } catch (e: RuntimeException) {
+            Log.e("FightTracker", "Could not start screen capture", e)
+            TrackingController.stopAndSave(this, closeOverlay = true)
         }
 
-        startCapture()
-
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     private fun startCapture() {
@@ -2021,6 +2039,7 @@ class FightTrackerService : Service() {
 
     /** Adds one reward to the totals and remembers it for undo. */
     private fun applyReward(d: RewardDelta) {
+        if (destroyed || !TrackingController.isRunning) return
 
         totalGold += d.gold
         totalOrns += d.orns
@@ -2166,6 +2185,7 @@ class FightTrackerService : Service() {
         sessionProofs: Map<String, Long>,
         checkDuplicate: Boolean
     ) {
+        if (destroyed || !TrackingController.isRunning) return
 
         if (checkDuplicate) {
 
@@ -2295,15 +2315,22 @@ class FightTrackerService : Service() {
 
         return diff.toFloat() / cur.size
     }
-    override fun onDestroy() {
-
+    fun prepareToStop() {
         destroyed = true
-
-        instance = null
-
-        // stop the scan loop (it used to keep running after the service died)
         scanLoop?.let { handler.removeCallbacks(it) }
         handler.removeCallbacksAndMessages(null)
+    }
+
+    override fun onDestroy() {
+        prepareToStop()
+        // Explicit stops have already saved the run; unexpected destruction
+        // reaches the same idempotent completion path here.
+        if (TrackingController.isRunning) {
+            TrackingController.finishSession(this, closeOverlay = true)
+        } else {
+            TrackingController.cancelStart()
+        }
+        instance = null
 
         // terminate a running Paddle inference and stop the worker
         RewardOcrEngine.cancel()
@@ -2312,6 +2339,7 @@ class FightTrackerService : Service() {
         virtualDisplay?.release()
         imageReader?.close()
         mediaProjection?.stop()
+        recognizer.close()
 
         super.onDestroy()
     }

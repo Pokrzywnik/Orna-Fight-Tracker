@@ -62,4 +62,8 @@ data class RunRecord(
     val proofs: Map<String, Long> = emptyMap(),
     /** [RunType.key] or null (= "Other"). */
     val type: String? = null
-)
+) {
+    val isEmpty: Boolean
+        get() = gold == 0L && orns == 0L && exp == 0L && shards == 0L &&
+            proofs.values.all { it == 0L }
+}

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="tutorial_material_calendar" type="id" />
+    <item name="tutorial_material_guilds" type="id" />
+    <item name="tutorial_material_watchlist" type="id" />
+</resources>

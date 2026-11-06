@@ -60,6 +60,7 @@ class TrackerFragment : Fragment() {
     private lateinit var adapter: RunHistoryAdapter
 
     private var allRuns: List<RunRecord> = emptyList()
+    private var historyVersion = -1L
 
     /** null = "All" */
     private var typeFilter: RunType? = null
@@ -98,6 +99,10 @@ class TrackerFragment : Fragment() {
 
         b.overlayToggle.setOnClickListener {
             (activity as? MainActivity)?.toggleFloatingService()
+        }
+        b.rewardsOverlayToggle.setOnClickListener {
+            (activity as? MainActivity)?.toggleRewardsOverlay()
+            updateLive()
         }
 
         b.trackingRow.setOnClickListener {
@@ -175,10 +180,8 @@ class TrackerFragment : Fragment() {
         }
 
         b.startButton.setOnClickListener {
-            FightState.startTime = System.currentTimeMillis()
-            FightState.ornsConfirmationThreshold = 3_000_000L
             (activity as MainActivity).startCapture()
-            recording = 1
+            updateLive()
         }
 
         b.undoButton.setOnClickListener {
@@ -243,7 +246,6 @@ class TrackerFragment : Fragment() {
                         isHolding = false
 
                         if (recording == 1 || TrackingController.isRunning) {
-                            recording = 0
                             (activity as MainActivity).stopTracking()
                             reloadHistory()
                             updateLive()
@@ -364,10 +366,16 @@ class TrackerFragment : Fragment() {
 
         val b = _binding ?: return
         val ctx = context ?: return
+        if (historyVersion != TrackingController.historyVersion) {
+            reloadHistory()
+        }
 
         // overlay pill
         b.overlayDot.setBackgroundResource(
             if (FloatingTrackerService.isRunning) R.drawable.bg_dot else R.drawable.bg_dot_off
+        )
+        b.rewardsOverlayDot.setBackgroundResource(
+            if (OverlayService.isRunning) R.drawable.bg_dot else R.drawable.bg_dot_off
         )
 
         val running = TrackingController.isRunning
@@ -380,6 +388,7 @@ class TrackerFragment : Fragment() {
         )
 
         b.startButton.visibility = if (running) View.GONE else View.VISIBLE
+        b.startButton.isEnabled = !TrackingController.isStarting
         b.stopButton.visibility = if (running) View.VISIBLE else View.GONE
         b.undoButton.visibility = if (running) View.VISIBLE else View.GONE
         b.compactRates.visibility = if (running) View.VISIBLE else View.GONE
@@ -698,6 +707,7 @@ class TrackerFragment : Fragment() {
         val ctx = context ?: return
 
         allRuns = RunStorage.loadRuns(ctx)
+        historyVersion = TrackingController.historyVersion
 
         applyFilters()
     }

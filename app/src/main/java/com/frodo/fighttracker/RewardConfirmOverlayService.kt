@@ -103,7 +103,7 @@ class RewardConfirmOverlayService : Service() {
     }
 
     override fun onDestroy() {
-
+        timer?.cancel()
         super.onDestroy()
 
         if (::overlayView.isInitialized) {
