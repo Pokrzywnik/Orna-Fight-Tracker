@@ -72,6 +72,8 @@ internal class FirstStartTutorial(
     private var active = false
     private var disposed = false
     private var targetViews = emptyList<View>()
+    private var presentationGeneration = 0
+    private var targetWaitStartedAt = 0L
 
     private val backCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() = advance()
@@ -79,7 +81,6 @@ internal class FirstStartTutorial(
     private val updateBounds = ViewTreeObserver.OnGlobalLayoutListener {
         if (active && targetViews.isNotEmpty()) overlay.updateHighlight(targetViews)
     }
-    private val present = Runnable { presentStep() }
     private val unlock = Runnable {
         if (active && progress.canAdvance(SystemClock.uptimeMillis())) {
             overlay.showReady(progress.step == steps.lastIndex)
@@ -129,32 +130,65 @@ internal class FirstStartTutorial(
     private fun prepareStep() {
         handler.removeCallbacksAndMessages(null)
         progress.pause()
+        presentationGeneration++
+        targetWaitStartedAt = SystemClock.uptimeMillis()
         targetViews = emptyList()
         overlay.waitForTarget()
         onGleamingPreviewChanged(steps[progress.step].page == 3)
         navigate(steps[progress.step].page)
-        handler.post(present)
+        val generation = presentationGeneration
+        handler.post { presentStep(generation) }
     }
 
-    private fun presentStep() {
-        if (!active || disposed) return
+    private fun presentStep(generation: Int) {
+        if (!active || disposed || generation != presentationGeneration) return
         val step = steps[progress.step]
-        val views = step.targets.mapNotNull { activity.findViewById<View>(it) }
+        // IDs such as settingsButton are reused on multiple pages. Activity.findViewById()
+        // can therefore return a hidden ViewPager page and make this wait forever.
+        val views = step.targets.mapNotNull(::findVisibleTarget)
         if (overlay.width == 0 || overlay.height == 0 || views.size != step.targets.size ||
             views.any { !it.isShown || it.width == 0 || it.height == 0 }) {
-            handler.postDelayed(present, 32L)
+            retryOrPresentWithoutTarget(generation, step)
             return
         }
         // Keep the tracking-options row visible even on small screens / large UI scales.
         views.forEach { it.requestRectangleOnScreen(Rect(0, 0, it.width, it.height), true) }
         if (views.any { !it.getGlobalVisibleRect(Rect()) }) {
-            handler.postDelayed(present, 32L)
+            retryOrPresentWithoutTarget(generation, step)
             return
         }
+        presentCard(generation, step, views)
+    }
+
+    private fun findVisibleTarget(id: Int): View? {
+        fun search(view: View): View? {
+            if (view.id == id && view.isShown && view.width > 0 && view.height > 0) return view
+            if (view is ViewGroup) {
+                for (index in 0 until view.childCount) {
+                    search(view.getChildAt(index))?.let { return it }
+                }
+            }
+            return null
+        }
+        return search(root)
+    }
+
+    private fun retryOrPresentWithoutTarget(generation: Int, step: Step) {
+        if (SystemClock.uptimeMillis() - targetWaitStartedAt < TARGET_WAIT_TIMEOUT_MS) {
+            handler.postDelayed({ presentStep(generation) }, TARGET_RETRY_MS)
+        } else {
+            // A tutorial must never become an uncloseable dim screen. If a device fails
+            // to lay out the requested control, retain the explanation and navigation.
+            presentCard(generation, step, emptyList())
+        }
+    }
+
+    private fun presentCard(generation: Int, step: Step, views: List<View>) {
+        if (!active || disposed || generation != presentationGeneration) return
         targetViews = views
         overlay.showStep(progress.step + 1, steps.size, step.title, step.description, views)
         overlay.doOnPreDraw {
-            if (active && !disposed && targetViews === views) {
+            if (active && !disposed && generation == presentationGeneration && targetViews === views) {
                 progress.markVisible(SystemClock.uptimeMillis())
                 handler.postDelayed(unlock, TutorialProgress.READING_DELAY_MS)
             }
@@ -170,6 +204,11 @@ internal class FirstStartTutorial(
         } else {
             prepareStep()
         }
+    }
+
+    private companion object {
+        const val TARGET_RETRY_MS = 32L
+        const val TARGET_WAIT_TIMEOUT_MS = 2_000L
     }
 }
 
@@ -252,6 +291,11 @@ private class SpotlightView(
     }
 
     fun updateHighlight(targets: List<View>) {
+        if (targets.isEmpty()) {
+            highlight = null
+            invalidate()
+            return
+        }
         val origin = IntArray(2)
         getLocationOnScreen(origin)
         val bounds = RectF()

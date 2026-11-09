@@ -20,7 +20,6 @@ import android.widget.TextView
 import android.widget.Toast
 import android.util.Log
 import android.view.View
-import coil.load
 
 class OverlayService : Service() {
 
@@ -220,14 +219,8 @@ class OverlayService : Service() {
                     val icon = ImageView(overlayContext).apply {
                         layoutParams = LinearLayout.LayoutParams(dp(22), dp(22))
                         scaleType = ImageView.ScaleType.FIT_CENTER
-                        load(p.iconUrl) {
-                            crossfade(false)
-                            // Overlay windows use a software canvas, including
-                            // newly inflated views after a scale change.
-                            allowHardware(false)
-                            error(android.R.drawable.ic_menu_help)
-                        }
                     }
+                    UiKit.loadProofIcon(icon, p.iconUrl)
 
                     val tv = TextView(overlayContext).apply {
                         setTextColor(Color.WHITE)

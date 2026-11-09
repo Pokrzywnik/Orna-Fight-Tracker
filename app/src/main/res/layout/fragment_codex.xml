@@ -25,7 +25,7 @@
                 style="@style/TextAppearance.FT.Overline"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/ft_overline_reference" />
+                android:text="@string/ft_overline_codex_title" />
 
             <TextView
                 style="@style/TextAppearance.FT.Title"

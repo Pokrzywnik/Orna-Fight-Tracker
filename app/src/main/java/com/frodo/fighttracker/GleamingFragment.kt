@@ -2,6 +2,8 @@ package com.frodo.fighttracker
 
 import android.os.Bundle
 import android.os.Parcelable
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import androidx.fragment.app.Fragment
@@ -28,6 +30,7 @@ class GleamingFragment : Fragment(R.layout.fragment_gleaming) {
     private var mobs: List<GleamingMob> = emptyList()
     private var tiers: List<Int> = emptyList()
     private var selectedTier = TIER_ALL
+    private var searchQuery = ""
     private var tutorialPreview = false
     private var collectionScrollState: Parcelable? = null
 
@@ -59,6 +62,18 @@ class GleamingFragment : Fragment(R.layout.fragment_gleaming) {
         }
         b.gleamingList.adapter = adapter
         b.gleamingList.itemAnimator = null
+
+        b.gleamingSearchInput.setText(searchQuery)
+        b.gleamingSearchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+
+            override fun afterTextChanged(s: Editable?) {
+                searchQuery = s?.toString().orEmpty()
+                refresh()
+                b.gleamingList.scrollToPosition(0)
+            }
+        })
 
         buildChips(b)
         refresh()
@@ -142,6 +157,8 @@ class GleamingFragment : Fragment(R.layout.fragment_gleaming) {
         val rows = buildList<GleamingRow> {
             for (tier in shownTiers) {
                 val list = byTier[tier].orEmpty()
+                    .filter { GleamingSearch.matches(it, searchQuery) }
+                if (list.isEmpty()) continue
                 add(GleamingRow.Header(tier, found(list), list.size))
                 list.forEach { add(GleamingRow.Mob(it, it.id in discovered)) }
             }

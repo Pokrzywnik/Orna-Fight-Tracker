@@ -7,6 +7,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import coil.load
+import coil.size.Size
 import java.util.Locale
 
 /**
@@ -66,9 +67,14 @@ object UiKit {
         )
     }
 
-    private fun loadIcon(view: ImageView, url: String) {
+    fun loadProofIcon(view: ImageView, url: String) {
+        view.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
         view.load(url) {
+            size(Size.ORIGINAL)
+            memoryCacheKey("proof-original:$url")
             crossfade(false)
+            allowHardware(false)
+            listener(onSuccess = { _, _ -> view.drawable?.setFilterBitmap(false) })
             error(android.R.drawable.ic_menu_help)
         }
     }
@@ -96,7 +102,7 @@ object UiKit {
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
 
-        loadIcon(icon, iconUrl)
+        loadProofIcon(icon, iconUrl)
 
         val counter = TextView(ctx).apply {
             setTextAppearance(R.style.TextAppearance_FT_Number)
@@ -128,7 +134,7 @@ object UiKit {
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
 
-        loadIcon(icon, iconUrl)
+        loadProofIcon(icon, iconUrl)
 
         val number = TextView(ctx).apply {
             setTextAppearance(R.style.TextAppearance_FT_Number)

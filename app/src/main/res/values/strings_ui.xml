@@ -19,8 +19,8 @@
     <!-- Tracker -->
     <string name="ft_overline_tracker">FIGHT TRACKER</string>
     <string name="ft_tracker_title">Tracker</string>
-    <string name="ft_overlay">Assess Overlay</string>
-    <string name="ft_rewards_overlay">Rewards Overlay</string>
+    <string name="ft_overlay">Assess</string>
+    <string name="ft_rewards_overlay">Rewards</string>
     <string name="ft_overlay_scale">Overlay scale</string>
     <string name="ft_overlay_scale_desc">Scales the rewards overlay only. Applied after saving.</string>
     <string name="ft_tracking">TRACKING</string>
@@ -103,6 +103,7 @@
     <string name="ft_select_materials">Select Materials</string>
 
     <!-- Codex -->
+    <string name="ft_overline_codex_title">Knowledge database</string>
     <string name="ft_codex_title">Codex</string>
     <string name="ft_codex_aussie">Aussie\'s Codex</string>
     <string name="ft_codex_yaco">Codex Yaco</string>
@@ -114,6 +115,7 @@
     <string name="ft_gleaming_empty_sub">Track the gleaming world mobs you\'ve encountered</string>
 
     <!-- Guides -->
+    <string name="ft_overline_guides_title">Monuments and towers</string>
     <string name="ft_guides_title">Guides</string>
     <string name="ft_guides_monuments">Monuments</string>
     <string name="ft_guides_towers">Tower heights</string>
