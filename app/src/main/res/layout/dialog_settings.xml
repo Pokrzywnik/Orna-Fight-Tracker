@@ -53,27 +53,37 @@
             android:layout_marginStart="4dp"
             android:text="@string/ft_high_quality_ocr_desc" />
 
-        <CheckBox
-            android:id="@+id/legacyOcrCheck"
+        <TextView
+            style="@style/TextAppearance.FT.Body"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:minHeight="48dp"
-            android:text="@string/ft_legacy_ocr" />
+            android:text="@string/ft_ocr_mode" />
 
-        <CheckBox
-            android:id="@+id/experimentalOcrCheck"
+        <com.google.android.material.slider.Slider
+            android:id="@+id/ocrModeSlider"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="48dp"
-            android:text="@string/ft_experimental_ocr" />
+            android:stepSize="1"
+            android:valueFrom="0"
+            android:valueTo="3" />
 
         <TextView
+            android:id="@+id/ocrModeLabel"
+            style="@style/TextAppearance.FT.Body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/ocrModeDescription"
             style="@style/TextAppearance.FT.Muted"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
             android:layout_marginStart="4dp"
-            android:text="@string/ft_experimental_ocr_desc" />
+            android:gravity="center" />
 
         <View
             style="@style/Widget.FT.Divider"

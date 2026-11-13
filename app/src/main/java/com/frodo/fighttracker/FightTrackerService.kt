@@ -52,6 +52,10 @@ class FightTrackerService : Service() {
         private const val EXP_ROI_TOP = 0.20f
         private const val EXP_ROI_BOTTOM = 0.70f
 
+        /** WIP also covers large-UI layouts where XP starts near 10% of the screen. */
+        private const val WIP_ROI_TOP = 0.05f
+        private const val WIP_ROI_BOTTOM = 0.75f
+
         /** < this fraction of sampled pixels changed since the previous tick = screen is settled */
         private const val EXP_STABLE_DIFF = 0.05f
 
@@ -106,6 +110,9 @@ class FightTrackerService : Service() {
 
     @Volatile
     private var ocrBusy = false
+
+    /** Fixed for one capture session; changing mode applies to the next run. */
+    private var ocrMode = RewardOcrMode.DEFAULT
 
 
 
@@ -164,6 +171,8 @@ class FightTrackerService : Service() {
         }
 
         TrackerLogger.startNewSession(this)
+        ocrMode = SettingsStore.getOcrMode(this)
+        Log.i("OCR_WIP", "Session OCR mode=$ocrMode")
         createNotificationChannel()
 
         val stopIntent = Intent(this, FightTrackerService::class.java)
@@ -223,7 +232,10 @@ class FightTrackerService : Service() {
                 Handler(Looper.getMainLooper())
             )
             // Load Paddle models in the background so the first scan is not delayed
-            if (SettingsStore.getExperimentalOcr(this)) {
+            if (ocrMode in setOf(
+                    RewardOcrMode.EXPERIMENTAL,
+                    RewardOcrMode.WIP
+                )) {
 
                 try {
 
@@ -259,7 +271,10 @@ class FightTrackerService : Service() {
 
     private fun startCapture() {
         val interval =
-            if (SettingsStore.getExperimentalOcr(this)) 50L
+            if (ocrMode in setOf(
+                    RewardOcrMode.EXPERIMENTAL,
+                    RewardOcrMode.WIP
+                )) 50L
             else SettingsStore.getScanInterval(this@FightTrackerService)
 
         val metrics = resources.displayMetrics
@@ -606,17 +621,11 @@ class FightTrackerService : Service() {
 
     private fun scanScreen() {
 
-        when {
-
-            // overrides "use legacy OCR algorithm"
-            SettingsStore.getExperimentalOcr(this) ->
-                scanScreenExperimental()
-
-            SettingsStore.getLegacyOcr(this) ->
-                scanScreenLegacy()
-
-            else ->
-                scanScreenModern()
+        when (ocrMode) {
+            RewardOcrMode.LEGACY -> scanScreenLegacy()
+            RewardOcrMode.DEFAULT -> scanScreenModern()
+            RewardOcrMode.EXPERIMENTAL -> scanScreenExperimental()
+            RewardOcrMode.WIP -> scanScreenWip()
         }
     }
 
@@ -642,7 +651,18 @@ class FightTrackerService : Service() {
         )
     }
 
-    private fun scanScreenExperimental() {
+    private fun wipRegion(w: Int, h: Int): Rect = Rect(
+        0,
+        (h * WIP_ROI_TOP).toInt(),
+        w,
+        (h * WIP_ROI_BOTTOM).toInt()
+    )
+
+    private fun scanScreenExperimental() = scanScreenPaddle(wip = false)
+
+    private fun scanScreenWip() = scanScreenPaddle(wip = true)
+
+    private fun scanScreenPaddle(wip: Boolean) {
 
         val reader = imageReader ?: return
 
@@ -657,12 +677,15 @@ class FightTrackerService : Service() {
         val captureMs = android.os.SystemClock.elapsedRealtime()
 
         // cheap (~0.1 ms): runs on EVERY tick, also while OCR is busy
-        val diff = frameDiff(image)
+        val diff = if (wip) frameDiffWip(image) else frameDiff(image)
 
         if (diff >= EXP_STABLE_DIFF) {
             // screen is moving / changed: it must be scanned once it settles
             expNeedScan = true
             expRetries = 0
+            if (wip) {
+                Log.d("OCR_WIP", "Frame changed diff=%.3f -> waiting for settle".format(diff))
+            }
         }
 
         if (diff >= EXP_BIG_CHANGE_DIFF) {
@@ -680,6 +703,13 @@ class FightTrackerService : Service() {
 
         val bigChangeBefore = expBigChange
         expBigChange = false
+
+        if (wip) {
+            Log.d(
+                "OCR_WIP",
+                "Settled frame diff=%.3f bigChange=$bigChangeBefore -> starting OCR".format(diff)
+            )
+        }
 
         var fullBitmap: Bitmap? = null
 
@@ -730,26 +760,53 @@ class FightTrackerService : Service() {
             paddleExecutor.execute {
 
                 var cropped: Bitmap? = null
+                var processed: Bitmap? = null
 
                 try {
 
-                    val r = experimentalRegion(frame.width, frame.height)
+                    val r = if (wip) {
+                        wipRegion(frame.width, frame.height)
+                    } else {
+                        experimentalRegion(frame.width, frame.height)
+                    }
 
                     cropped = Bitmap.createBitmap(
                         frame, r.left, r.top, r.width(), r.height()
                     )
 
-                    val input: Bitmap = cropped
+                    val input: Bitmap = if (wip) {
+                        createWipTextMask(cropped).also { processed = it }
+                    } else {
+                        cropped
+                    }
+
+                    if (wip) {
+                        Log.d(
+                            "OCR_WIP",
+                            "OCR region screen=${frame.width}x${frame.height} " +
+                                "crop=[${r.left},${r.top}-${r.right},${r.bottom}] " +
+                                "input=${input.width}x${input.height}"
+                        )
+                    }
 
                     // the scanned image IS the reward band (header may be cut off)
                     val scan = RewardOcrEngine.scan(
                         applicationContext,
                         input,
-                        stopWhen = { partial ->
-                            // stop reading as soon as xp + gold + orns are known:
-                            // the drop list below them is never recognised
-                            val p = RewardTextParser.parse(applicationContext, partial, true)
-                            p.xpRow != null && p.goldRow != null && p.ornsRow != null
+                        stopWhen = if (wip) {
+                            { partial ->
+                                // Current reward layout places every proof/key
+                                // above currencies. Once Orns is read, all of
+                                // them have already passed through recognition.
+                                WipRewardTextParser.hasCompleteCore(partial.boxes)
+                            }
+                        } else {
+                            { partial ->
+                                RewardTextParser.parse(applicationContext, partial, true)
+                                    .let { p ->
+                                        p.xpRow != null && p.goldRow != null && p.ornsRow != null
+                                    }
+                            }
                         }
                     )
 
@@ -757,21 +814,80 @@ class FightTrackerService : Service() {
                         return@execute
                     }
 
-                    val result =
+                    var result = if (wip) {
+                        WipRewardTextParser.parse(applicationContext, scan)
+                    } else {
                         RewardTextParser.parse(applicationContext, scan, true)
+                    }
+
+                    val playerXpRow = result.xpRow
+                    if (wip && result.solid && playerXpRow != null &&
+                        scan.boxes.any { looksLikeProofReward(it.text) }
+                    ) {
+                        var proofCrop: Bitmap? = null
+                        var proofMask: Bitmap? = null
+                        try {
+                            // The relaxed pass ends above player XP, so dim proof
+                            // counts are retained without letting background or
+                            // currency text contaminate the numeric core.
+                            val sourceCrop = checkNotNull(cropped)
+                            val proofBottom = playerXpRow.top.coerceIn(
+                                MIN_OCR_SIZE,
+                                sourceCrop.height
+                            )
+                            proofCrop = Bitmap.createBitmap(
+                                sourceCrop, 0, 0, sourceCrop.width, proofBottom
+                            )
+                            proofMask = createWipProofMask(proofCrop)
+                            val proofScan = RewardOcrEngine.scan(
+                                applicationContext,
+                                proofMask
+                            )
+                            val relaxedProofs = RewardTextParser.parseProofs(
+                                applicationContext,
+                                proofScan.boxes
+                            )
+                            Log.d(
+                                "OCR_WIP",
+                                "PROOF PASS height=$proofBottom boxes=${proofScan.boxes.size} " +
+                                    "proofs=$relaxedProofs"
+                            )
+                            if (relaxedProofs.isNotEmpty()) {
+                                val merged = result.parsed.proofs.toMutableMap()
+                                for ((id, count) in relaxedProofs) {
+                                    // The two passes see the same reward. Keep
+                                    // the richer reading if either pass lost a
+                                    // dim count and fell back to one.
+                                    merged[id] = maxOf(merged[id] ?: 0L, count)
+                                }
+                                result = result.copy(
+                                    parsed = result.parsed.copy(proofs = merged)
+                                )
+                            }
+                        } finally {
+                            recycleBitmapSafe(proofMask)
+                            recycleBitmapSafe(proofCrop)
+                        }
+                    }
 
                     handler.post {
                         if (!destroyed) {
-                            onExperimentalResult(scan, result, r, captureMs, bigChangeBefore)
+                            if (wip) {
+                                onWipResult(scan, result, r, captureMs, bigChangeBefore)
+                            } else {
+                                onExperimentalResult(scan, result, r, captureMs, bigChangeBefore)
+                            }
                         }
                     }
 
                 } catch (e: Exception) {
 
-                    Log.e("OCR_RAW", "Experimental OCR failed", e)
+                    Log.e("OCR_RAW", if (wip) "WIP OCR failed" else "Experimental OCR failed", e)
+                    if (wip) Log.e("OCR_WIP", "WIP OCR worker failed", e)
 
                 } finally {
 
+                    recycleBitmapSafe(processed)
                     recycleBitmapSafe(cropped)
                     recycleBitmapSafe(frame)
 
@@ -781,7 +897,8 @@ class FightTrackerService : Service() {
 
         } catch (e: Exception) {
 
-            Log.e("OCR_RAW", "Could not start experimental OCR", e)
+            Log.e("OCR_RAW", if (wip) "Could not start WIP OCR" else "Could not start experimental OCR", e)
+            if (wip) Log.e("OCR_WIP", "Could not enqueue WIP OCR", e)
             recycleBitmapSafe(frame)
             ocrBusy = false
             expNeedScan = true
@@ -917,6 +1034,196 @@ class FightTrackerService : Service() {
             sessionProofs = p.proofs,
             checkDuplicate = false
         )
+    }
+
+    /** WIP never commits a partial currency read. */
+    private fun onWipResult(
+        scan: RewardOcrEngine.ScanResult,
+        result: RewardTextParser.Result,
+        region: Rect,
+        captureMs: Long,
+        bigChangeBefore: Boolean
+    ) {
+        val latencyMs = android.os.SystemClock.elapsedRealtime() - captureMs
+        val rowsText = scan.rows.joinToString("\n") { it.text }
+        val boxesText = scan.boxes.joinToString("\n") {
+            "[${it.left},${it.top}-${it.right},${it.bottom}] ${it.text}"
+        }
+
+        Log.d(
+            "OCR_WIP",
+            "RESULT boxes=${scan.boxCount} recognized=${scan.recognizedCount} " +
+                "kept=${scan.boxes.size} early=${scan.stoppedEarly} " +
+                "det=%.0fms rec=%.0fms total=${latencyMs}ms".format(
+                    scan.detectMs,
+                    scan.recognizeMs
+                )
+        )
+        Log.d("OCR_WIP", "BOXES:\n${boxesText.ifBlank { "<none>" }}")
+        Log.d("OCR_WIP", "ROWS:\n${rowsText.ifBlank { "<none>" }}")
+        Log.d(
+            "OCR_WIP",
+            "PARSED rewardScreen=${result.rewardScreen} solid=${result.solid} " +
+                "value=${result.parsed} xpBox=${result.xpRow} " +
+                "goldBox=${result.goldRow} ornsBox=${result.ornsRow}"
+        )
+
+        if (DebugController.enabled) {
+            OcrDebugBuffer.lastText = rowsText
+            OcrDebugBuffer.userCrop = region
+            OcrDebugBuffer.finalCrop = region
+            OcrDebugBuffer.bookmarkRect = null
+
+            fun toScreen(row: RewardOcrEngine.OcrBox?): Rect? = row?.let {
+                Rect(
+                    region.left + it.left,
+                    region.top + it.top,
+                    region.left + it.right,
+                    region.top + it.bottom
+                )
+            }
+            OcrDebugBuffer.xpRect = toScreen(result.xpRow)
+            OcrDebugBuffer.goldRect = toScreen(result.goldRow)
+            OcrDebugBuffer.ornsRect = toScreen(result.ornsRow)
+        }
+
+        TrackerLogger.write("OCR_RAW", "================ WIP PADDLE FRAME ================")
+        TrackerLogger.write("OCR_RAW", rowsText)
+        TrackerLogger.write(
+            "TRACKER_LOG",
+            "WIP parsed=${result.parsed} solid=${result.solid} " +
+                "boxes=${scan.boxCount}/${scan.recognizedCount} " +
+                "capture->parsed=${latencyMs}ms"
+        )
+
+        if (!result.solid) {
+            // The first settled frame may precede the last reward-row animation.
+            if (result.rewardScreen && expRetries < 1) {
+                expRetries++
+                expNeedScan = true
+                Log.w("OCR_WIP", "REJECT incomplete reward -> retry ${expRetries}/1")
+            } else {
+                Log.w(
+                    "OCR_WIP",
+                    "REJECT solid=false rewardScreen=${result.rewardScreen} retries=$expRetries"
+                )
+            }
+            return
+        }
+
+        val xpTop = result.xpRow?.top ?: -1
+        val samePopup = result.parsed == wipLastCommitted &&
+            (!bigChangeBefore || xpTop != wipLastCommittedXpTop)
+        if (samePopup) {
+            Log.d("OCR_WIP", "REJECT duplicate popup value=${result.parsed}")
+            TrackerLogger.write("TRACKER_LOG", "WIP duplicate popup ignored")
+            return
+        }
+
+        wipLastCommitted = result.parsed
+        wipLastCommittedXpTop = xpTop
+        commitExperimental(result.parsed)
+        Log.i("OCR_WIP", "COMMIT value=${result.parsed} latency=${latencyMs}ms")
+        TrackerLogger.write("TRACKER_LOG", "WIP COMMIT capture->commit=${latencyMs}ms")
+    }
+
+    /**
+     * Reward text is bright neutral white while the game behind the popup is
+     * dimmed. Keeping only bright, low-chroma pixels prevents background HP,
+     * damage and buff values from being attached to currency amounts.
+     */
+    private fun createWipTextMask(source: Bitmap): Bitmap {
+        val started = android.os.SystemClock.elapsedRealtime()
+        val width = source.width
+        val height = source.height
+        val pixels = IntArray(width * height)
+        source.getPixels(pixels, 0, width, 0, 0, width, height)
+
+        var keptStrong = 0
+        var keptProofGray = 0
+        // Proofs/keys are above currencies in the current reward layout.
+        // Their counts use a dimmer grey style, including wrapped "Slain (3)".
+        val proofBandBottom = (height * 0.57f).toInt()
+
+        for (y in 0 until height) {
+            val allowProofGray = y < proofBandBottom
+            val rowStart = y * width
+            for (x in 0 until width) {
+                val index = rowStart + x
+                val color = pixels[index]
+                val red = Color.red(color)
+                val green = Color.green(color)
+                val blue = Color.blue(color)
+                val brightest = maxOf(red, green, blue)
+                val darkest = minOf(red, green, blue)
+                val chroma = brightest - darkest
+                val luminance = (red * 299 + green * 587 + blue * 114) / 1000
+                val strongText = luminance >= 135 && chroma <= 60
+                val proofGray = allowProofGray && luminance >= 95 && chroma <= 45
+
+                pixels[index] = when {
+                    strongText -> {
+                        keptStrong++
+                        Color.WHITE
+                    }
+                    proofGray -> {
+                        keptProofGray++
+                        Color.WHITE
+                    }
+                    else -> Color.BLACK
+                }
+            }
+        }
+
+        return Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888).also {
+            Log.d(
+                "OCR_WIP",
+                "White-text mask strong=${keptStrong * 100f / pixels.size}% " +
+                    "proofGray=${keptProofGray * 100f / pixels.size}% " +
+                    "proofBand=0..$proofBandBottom " +
+                    "time=${android.os.SystemClock.elapsedRealtime() - started}ms"
+            )
+        }
+    }
+
+    private fun looksLikeProofReward(text: String): Boolean {
+        val normalized = RewardTextParser.normalizeProofText(
+            text.lowercase().filter(Char::isLetterOrDigit)
+        )
+        return normalized.contains("proof") || normalized.startsWith("skeleton")
+    }
+
+    /** Relaxed neutral-grey mask used only above the detected player XP row. */
+    private fun createWipProofMask(source: Bitmap): Bitmap {
+        val started = android.os.SystemClock.elapsedRealtime()
+        val width = source.width
+        val height = source.height
+        val pixels = IntArray(width * height)
+        source.getPixels(pixels, 0, width, 0, 0, width, height)
+
+        var kept = 0
+        for (index in pixels.indices) {
+            val color = pixels[index]
+            val red = Color.red(color)
+            val green = Color.green(color)
+            val blue = Color.blue(color)
+            val chroma = maxOf(red, green, blue) - minOf(red, green, blue)
+            val luminance = (red * 299 + green * 587 + blue * 114) / 1000
+            pixels[index] = if (luminance >= 90 && chroma <= 50) {
+                kept++
+                Color.WHITE
+            } else {
+                Color.BLACK
+            }
+        }
+
+        return Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888).also {
+            Log.d(
+                "OCR_WIP",
+                "Proof mask kept=${kept * 100f / pixels.size}% " +
+                    "time=${android.os.SystemClock.elapsedRealtime() - started}ms"
+            )
+        }
     }
 
     // ------------------------------------------------------------------
@@ -2247,6 +2554,7 @@ class FightTrackerService : Service() {
         return digits.toLongOrNull() ?: 0L
     }
     private var lastSamples: IntArray? = null
+    private var wipLastSamples: IntArray? = null
     /** true = the screen changed since it was last scanned; scan it once it settles */
     private var expNeedScan = true
 
@@ -2259,6 +2567,10 @@ class FightTrackerService : Service() {
     private var expLastCommitted: RewardTextParser.Parsed? = null
 
     private var expLastCommittedXpTop = -1
+
+    private var wipLastCommitted: RewardTextParser.Parsed? = null
+
+    private var wipLastCommittedXpTop = -1
 
     /**
      * Fraction (0..1) of the sampled pixels that changed since the previous
@@ -2314,6 +2626,53 @@ class FightTrackerService : Service() {
         }
 
         return diff.toFloat() / cur.size
+    }
+
+    /**
+     * WIP watches only the relative reward band. This avoids rescanning for
+     * animated backgrounds or navigation outside the popup and behaves the
+     * same across resolutions/densities.
+     */
+    private fun frameDiffWip(image: Image): Float {
+        val plane = image.planes[0]
+        val buffer = plane.buffer
+        val pixelStride = plane.pixelStride
+        val rowStride = plane.rowStride
+        val region = wipRegion(image.width, image.height)
+        val columns = 20
+        val rows = 30
+        val current = IntArray(columns * rows)
+        var index = 0
+
+        for (yi in 0 until rows) {
+            val y = region.top + yi * (region.height() - 1) / (rows - 1)
+            for (xi in 0 until columns) {
+                val x = region.left + xi * (region.width() - 1) / (columns - 1)
+                val offset = y * rowStride + x * pixelStride
+                if (offset + 2 < buffer.limit()) {
+                    val r = (buffer.get(offset).toInt() and 0xFF) shr 4
+                    val g = (buffer.get(offset + 1).toInt() and 0xFF) shr 4
+                    val b = (buffer.get(offset + 2).toInt() and 0xFF) shr 4
+                    current[index] = (r shl 8) or (g shl 4) or b
+                }
+                index++
+            }
+        }
+
+        val previous = wipLastSamples
+        wipLastSamples = current
+        if (previous == null) return 1f
+
+        var changed = 0
+        for (i in current.indices) {
+            val a = current[i]
+            val b = previous[i]
+            val delta = kotlin.math.abs((a shr 8) - (b shr 8)) +
+                kotlin.math.abs(((a shr 4) and 0xF) - ((b shr 4) and 0xF)) +
+                kotlin.math.abs((a and 0xF) - (b and 0xF))
+            if (delta >= 3) changed++
+        }
+        return changed.toFloat() / current.size
     }
     fun prepareToStop() {
         destroyed = true

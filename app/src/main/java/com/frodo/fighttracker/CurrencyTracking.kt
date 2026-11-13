@@ -3,7 +3,7 @@ package com.frodo.fighttracker
 import android.content.Context
 
 /**
- * Which of Orns / EXP / Gold are shown in the Tracker tab
+ * Which of Orns / EXP / Gold / Shards are shown in the Tracker tab
  * and in the floating overlay. Default: all on.
  */
 object CurrencyTracking {
@@ -11,7 +11,8 @@ object CurrencyTracking {
     enum class Currency(val key: String, val label: String) {
         ORNS("orns", "Orns"),
         EXP("exp", "EXP"),
-        GOLD("gold", "Gold")
+        GOLD("gold", "Gold"),
+        SHARDS("shards", "Shards")
     }
 
     private const val PREF = "settings"

@@ -107,30 +107,72 @@ object SettingsStore {
     private const val KEY_HIGH_QUALITY_OCR = "high_quality_ocr"
     private const val KEY_LEGACY_OCR = "legacy_ocr"
     private const val KEY_EXPERIMENTAL_OCR = "experimental_ocr"
+    private const val KEY_OCR_MODE = "ocr_mode"
+    private const val KEY_OCR_WIP_DEFAULT_MIGRATION = "ocr_wip_default_migration_v1"
+
+    /**
+     * Release switch: while true, every installation selects WIP once for this
+     * migration. Set to false in the next release to stop forcing the mode.
+     * Users can still choose another mode after this one-time migration runs.
+     */
+    private const val FORCE_WIP_OCR_FOR_THIS_RELEASE = true
+
+    fun getOcrMode(context: Context): RewardOcrMode {
+        val prefs = context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+        val savedMode = if (prefs.contains(KEY_OCR_MODE)) {
+            RewardOcrMode.fromValue(prefs.getInt(KEY_OCR_MODE, RewardOcrMode.DEFAULT.value))
+        } else {
+            // Preserve deliberate selections made with the old boolean settings.
+            when {
+                prefs.getBoolean(KEY_EXPERIMENTAL_OCR, false) -> RewardOcrMode.EXPERIMENTAL
+                prefs.getBoolean(KEY_LEGACY_OCR, false) -> RewardOcrMode.LEGACY
+                else -> RewardOcrMode.DEFAULT
+            }
+        }
+
+        if (FORCE_WIP_OCR_FOR_THIS_RELEASE &&
+            !prefs.getBoolean(KEY_OCR_WIP_DEFAULT_MIGRATION, false)
+        ) {
+            prefs.edit()
+                .putInt(KEY_OCR_MODE, RewardOcrMode.WIP.value)
+                .putBoolean(KEY_OCR_WIP_DEFAULT_MIGRATION, true)
+                .apply()
+            return RewardOcrMode.WIP
+        }
+
+        return savedMode
+    }
+
+    fun setOcrMode(context: Context, mode: RewardOcrMode) {
+        context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
+            .edit().putInt(KEY_OCR_MODE, mode.value).apply()
+    }
 
     /** PaddleOCR reward scanner. Overrides the legacy OCR setting. */
     fun getExperimentalOcr(context: Context): Boolean {
-        return context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
-            .getBoolean(KEY_EXPERIMENTAL_OCR, false)
+        return getOcrMode(context) == RewardOcrMode.EXPERIMENTAL
     }
 
     fun setExperimentalOcr(context: Context, value: Boolean) {
-        context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean(KEY_EXPERIMENTAL_OCR, value)
-            .apply()
+        setOcrMode(
+            context,
+            if (value) RewardOcrMode.EXPERIMENTAL
+            else if (getOcrMode(context) == RewardOcrMode.EXPERIMENTAL) RewardOcrMode.DEFAULT
+            else getOcrMode(context)
+        )
     }
 
     fun getLegacyOcr(context: Context): Boolean {
-        return context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
-            .getBoolean(KEY_LEGACY_OCR, false)
+        return getOcrMode(context) == RewardOcrMode.LEGACY
     }
 
     fun setLegacyOcr(context: Context, value: Boolean) {
-        context.getSharedPreferences(PREF, Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean(KEY_LEGACY_OCR, value)
-            .apply()
+        setOcrMode(
+            context,
+            if (value) RewardOcrMode.LEGACY
+            else if (getOcrMode(context) == RewardOcrMode.LEGACY) RewardOcrMode.DEFAULT
+            else getOcrMode(context)
+        )
     }
 
     fun getHighQualityOcr(context: Context): Boolean {
@@ -800,14 +842,14 @@ class MainActivity : AppCompatActivity() {
             dialogView.findViewById<android.widget.CheckBox>(
                 R.id.highQualityOcrCheck
             )
-        val legacyOcrCheck =
-            dialogView.findViewById<android.widget.CheckBox>(
-                R.id.legacyOcrCheck
+        val ocrModeSlider =
+            dialogView.findViewById<com.google.android.material.slider.Slider>(
+                R.id.ocrModeSlider
             )
-        val experimentalOcrCheck =
-            dialogView.findViewById<android.widget.CheckBox>(
-                R.id.experimentalOcrCheck
-            )
+        val ocrModeLabel =
+            dialogView.findViewById<android.widget.TextView>(R.id.ocrModeLabel)
+        val ocrModeDescription =
+            dialogView.findViewById<android.widget.TextView>(R.id.ocrModeDescription)
         val shareLogsButton =
             dialogView.findViewById<android.widget.Button>(
                 R.id.shareLogsButton
@@ -846,17 +888,22 @@ class MainActivity : AppCompatActivity() {
         highQualityCheck.isChecked =
             SettingsStore.getHighQualityOcr(this)
 
-        legacyOcrCheck.isChecked =
-            SettingsStore.getLegacyOcr(this)
+        fun updateOcrMode(mode: RewardOcrMode) {
+            val (name, description) = when (mode) {
+                RewardOcrMode.LEGACY -> R.string.ft_ocr_mode_legacy to R.string.ft_ocr_mode_legacy_desc
+                RewardOcrMode.DEFAULT -> R.string.ft_ocr_mode_default to R.string.ft_ocr_mode_default_desc
+                RewardOcrMode.EXPERIMENTAL -> R.string.ft_ocr_mode_experimental to R.string.ft_ocr_mode_experimental_desc
+                RewardOcrMode.WIP -> R.string.ft_ocr_mode_wip to R.string.ft_ocr_mode_wip_desc
+            }
+            ocrModeLabel.setText(name)
+            ocrModeDescription.setText(description)
+        }
 
-        experimentalOcrCheck.isChecked =
-            SettingsStore.getExperimentalOcr(this)
-
-        // experimental mode overrides legacy OCR -> grey it out while it is on
-        legacyOcrCheck.isEnabled = !experimentalOcrCheck.isChecked
-
-        experimentalOcrCheck.setOnCheckedChangeListener { _, checked ->
-            legacyOcrCheck.isEnabled = !checked
+        val currentOcrMode = SettingsStore.getOcrMode(this)
+        ocrModeSlider.value = currentOcrMode.value.toFloat()
+        updateOcrMode(currentOcrMode)
+        ocrModeSlider.addOnChangeListener { _, value, _ ->
+            updateOcrMode(RewardOcrMode.fromValue(value.toInt()))
         }
 
         notifyCheck.isChecked =
@@ -1033,13 +1080,9 @@ class MainActivity : AppCompatActivity() {
                     this,
                     highQualityCheck.isChecked
                 )
-                SettingsStore.setLegacyOcr(
+                SettingsStore.setOcrMode(
                     this,
-                    legacyOcrCheck.isChecked
-                )
-                SettingsStore.setExperimentalOcr(
-                    this,
-                    experimentalOcrCheck.isChecked
+                    RewardOcrMode.fromValue(ocrModeSlider.value.toInt())
                 )
 
                 val selectedAura = auraSpinner.selectedItem as? String

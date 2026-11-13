@@ -92,6 +92,7 @@ class TrackerFragment : Fragment() {
         setupStatCells()
         setupRunCard()
         setupHistory()
+        setupResponsiveHeader()
 
         b.settingsButton.setOnClickListener {
             (activity as? MainActivity)?.showSettingsDialog()
@@ -113,6 +114,70 @@ class TrackerFragment : Fragment() {
         applyExpanded(animate = false)
 
         return b.root
+    }
+
+    /**
+     * Keeps Settings reachable at every UI scale. If the full header does not
+     * fit, decorative titles disappear and both overlay actions use the free
+     * column to the left of Settings.
+     */
+    private fun setupResponsiveHeader() {
+        val b = binding
+        var lastLayout: Pair<Boolean, Boolean>? = null
+        var naturalRewardsWidth = 0
+        var naturalAssessWidth = 0
+
+        fun applyLayout() {
+            if (_binding == null || b.trackerHeader.width <= 0) return
+
+            if (naturalRewardsWidth == 0) {
+                naturalRewardsWidth = b.rewardsOverlayToggle.measuredWidth
+                naturalAssessWidth = b.overlayToggle.measuredWidth
+            }
+
+            val gap = UiKit.dp(requireContext(), 8)
+            val settingsWidth = b.settingsButton.measuredWidth + gap
+            val actionsWidth = naturalRewardsWidth + naturalAssessWidth + gap
+            val stacked = actionsWidth + settingsWidth > b.trackerHeader.width
+            val showTitle = !stacked &&
+                actionsWidth + settingsWidth + UiKit.dp(requireContext(), 120) <=
+                b.trackerHeader.width
+
+            val layout = stacked to showTitle
+            if (lastLayout == layout) return
+            lastLayout = layout
+
+            b.trackerTitleContainer.visibility = if (showTitle) View.VISIBLE else View.GONE
+            b.trackerHeaderActions.orientation =
+                if (stacked) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
+            b.trackerHeaderActions.layoutParams = LinearLayout.LayoutParams(
+                if (stacked) 0 else LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                if (stacked) 1f else 0f
+            )
+
+            val rewardParams = LinearLayout.LayoutParams(
+                if (stacked) LinearLayout.LayoutParams.MATCH_PARENT
+                else LinearLayout.LayoutParams.WRAP_CONTENT,
+                UiKit.dp(requireContext(), 40)
+            )
+            b.rewardsOverlayToggle.layoutParams = rewardParams
+
+            val assessParams = LinearLayout.LayoutParams(
+                if (stacked) LinearLayout.LayoutParams.MATCH_PARENT
+                else LinearLayout.LayoutParams.WRAP_CONTENT,
+                UiKit.dp(requireContext(), 40)
+            ).apply {
+                if (stacked) topMargin = UiKit.dp(requireContext(), 6)
+                else marginStart = gap
+            }
+            b.overlayToggle.layoutParams = assessParams
+        }
+
+        b.trackerHeader.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            applyLayout()
+        }
+        b.trackerHeader.post { applyLayout() }
     }
 
     override fun onResume() {
@@ -495,7 +560,7 @@ class TrackerFragment : Fragment() {
 
         val ctx = context ?: return
 
-        // Orns / EXP / Gold visibility (shards are always shown, as before)
+        // Currency visibility follows the Track dialog.
         val shown = CurrencyTracking.getTracked(ctx)
 
         b.statGold.root.visibility =
@@ -506,6 +571,9 @@ class TrackerFragment : Fragment() {
 
         b.statExp.root.visibility =
             if (CurrencyTracking.Currency.EXP in shown) View.VISIBLE else View.GONE
+
+        b.statShards.root.visibility =
+            if (CurrencyTracking.Currency.SHARDS in shown) View.VISIBLE else View.GONE
 
         // compact header rates follow the same setting
         b.compactGold.visibility =
@@ -557,7 +625,7 @@ class TrackerFragment : Fragment() {
     // ------------------------------------------------------------------
 
     /**
-     * Section 1: Orns / EXP / Gold
+     * Section 1: Orns / EXP / Gold / Shards
      * Section 2: Proofs / King's guard / Skeleton key
      *
      * Each row: checkbox (track) + switch (show in overlay).
@@ -651,7 +719,7 @@ class TrackerFragment : Fragment() {
             root.addView(row)
         }
 
-        // --- Orns / EXP / Gold ---
+        // --- Orns / EXP / Gold / Shards ---
         addHeader(getString(R.string.ft_currencies))
 
         for (c in currencies) {

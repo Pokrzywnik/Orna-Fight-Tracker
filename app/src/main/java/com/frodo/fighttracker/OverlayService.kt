@@ -38,6 +38,7 @@ class OverlayService : Service() {
     private lateinit var ornsText: TextView
     private lateinit var xpText: TextView
     private lateinit var goldText: TextView
+    private lateinit var shardsText: TextView
     private lateinit var headerText: TextView
     private lateinit var toggleButton: TextView
     private lateinit var closeButton: TextView
@@ -47,6 +48,7 @@ class OverlayService : Service() {
     private lateinit var ornsRow: View
     private lateinit var xpRow: View
     private lateinit var goldRow: View
+    private lateinit var shardsRow: View
 
     /** proof id -> counter TextView shown in the overlay */
     private val proofViews = mutableMapOf<String, TextView>()
@@ -69,9 +71,11 @@ class OverlayService : Service() {
         val orns: Long = 0L,
         val exp: Long = 0L,
         val gold: Long = 0L,
+        val shards: Long = 0L,
         val lastOrns: Long = 0L,
         val lastExp: Long = 0L,
         val lastGold: Long = 0L,
+        val lastShards: Long = 0L,
         val proofs: Map<String, Long> = emptyMap(),
         val lastProofs: Map<String, Long> = emptyMap(),
         val minutes: Double = 1.0 / 60.0
@@ -89,9 +93,11 @@ class OverlayService : Service() {
             orns = FightState.orns,
             exp = FightState.exp,
             gold = FightState.gold,
+            shards = FightState.shards,
             lastOrns = FightState.lastOrns,
             lastExp = FightState.lastExp,
             lastGold = FightState.lastGold,
+            lastShards = FightState.lastShards,
             proofs = FightState.proofs.toMap(),
             lastProofs = FightState.lastProofs,
             minutes = minutes
@@ -136,6 +142,7 @@ class OverlayService : Service() {
                 ornsText.text = formatShort(snapshot.orns)
                 xpText.text = formatShort(snapshot.exp)
                 goldText.text = formatShort(snapshot.gold)
+                shardsText.text = formatShort(snapshot.shards)
             }
 
             // Per minute
@@ -151,6 +158,9 @@ class OverlayService : Service() {
 
                 goldText.text =
                     "${formatShort((snapshot.gold / snapshot.minutes).toLong())}/m"
+
+                shardsText.text =
+                    "${formatShort((snapshot.shards / snapshot.minutes).toLong())}/m"
             }
 
             // Last reward
@@ -166,6 +176,9 @@ class OverlayService : Service() {
 
                 goldText.text =
                     "+${formatShort(snapshot.lastGold)}"
+
+                shardsText.text =
+                    "+${formatShort(snapshot.lastShards)}"
             }
         }
 
@@ -173,7 +186,7 @@ class OverlayService : Service() {
         renderProofs(snapshot)
     }
 
-    /** Shows / hides Orns, EXP, Gold rows according to the Track dialog. */
+    /** Shows / hides currency and shard rows according to the Track dialog. */
     private fun updateCurrencyRows() {
 
         fun vis(c: CurrencyTracking.Currency) =
@@ -182,6 +195,7 @@ class OverlayService : Service() {
         ornsRow.visibility = vis(CurrencyTracking.Currency.ORNS)
         xpRow.visibility = vis(CurrencyTracking.Currency.EXP)
         goldRow.visibility = vis(CurrencyTracking.Currency.GOLD)
+        shardsRow.visibility = vis(CurrencyTracking.Currency.SHARDS)
     }
 
     private fun renderProofs(s: Snapshot) {
@@ -367,6 +381,7 @@ class OverlayService : Service() {
         ornsText = overlayView.findViewById(R.id.ornsText)
         xpText = overlayView.findViewById(R.id.xpText)
         goldText = overlayView.findViewById(R.id.goldText)
+        shardsText = overlayView.findViewById(R.id.shardsText)
         headerText = overlayView.findViewById(R.id.headerText)
         toggleButton = overlayView.findViewById(R.id.toggleButton)
         closeButton = overlayView.findViewById(R.id.closeButton)
@@ -376,6 +391,7 @@ class OverlayService : Service() {
         ornsRow = overlayView.findViewById(R.id.ornsRow)
         xpRow = overlayView.findViewById(R.id.xpRow)
         goldRow = overlayView.findViewById(R.id.goldRow)
+        shardsRow = overlayView.findViewById(R.id.shardsRow)
 
         toggleButton.setOnClickListener {
             onToggleClicked()

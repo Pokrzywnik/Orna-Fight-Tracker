@@ -19,12 +19,14 @@
 
         <!-- ================= Header ================= -->
         <LinearLayout
+            android:id="@+id/trackerHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
             <LinearLayout
+                android:id="@+id/trackerTitleContainer"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
@@ -34,14 +36,23 @@
                     style="@style/TextAppearance.FT.Overline"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:maxLines="1"
                     android:text="@string/ft_overline_tracker" />
 
                 <TextView
                     style="@style/TextAppearance.FT.Title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:maxLines="1"
                     android:text="@string/ft_tracker_title" />
             </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/trackerHeaderActions"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
             <LinearLayout
                 android:id="@+id/rewardsOverlayToggle"
@@ -118,6 +129,8 @@
                     android:layout_height="8dp"
                     android:layout_marginStart="8dp"
                     android:background="@drawable/bg_dot_off" />
+            </LinearLayout>
+
             </LinearLayout>
 
             <ImageButton

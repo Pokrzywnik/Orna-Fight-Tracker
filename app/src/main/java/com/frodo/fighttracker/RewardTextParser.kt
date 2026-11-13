@@ -216,6 +216,12 @@ object RewardTextParser {
     private fun squash(text: String): String =
         text.lowercase().filter { it.isLetterOrDigit() }
 
+    /** Common Paddle confusions in the word "Proof". */
+    internal fun normalizeProofText(text: String): String =
+        text.lowercase()
+            .replace("pro0f", "proof")
+            .replace("proot", "proof")
+
     private fun fuzzy(
         box: RewardOcrEngine.OcrBox,
         targets: List<String>,
@@ -450,7 +456,7 @@ object RewardTextParser {
      * its RIGHT (same row). Units are separated by "|" so a count can
      * never leak from one proof to the next.
      */
-    private fun parseProofs(
+    internal fun parseProofs(
         context: Context,
         boxes: List<RewardOcrEngine.OcrBox>
     ): Map<String, Long> {
@@ -470,7 +476,7 @@ object RewardTextParser {
 
             var text = asciiDigits(b.text)
 
-            val s = squash(b.text)
+            val s = normalizeProofText(squash(b.text))
 
             if (s.startsWith("proof") || s.startsWith("skeleton")) {
 
@@ -552,7 +558,7 @@ object RewardTextParser {
 
         val flat =
             units.joinToString("|") { unit ->
-                unit.lowercase().filter { !it.isWhitespace() }
+                normalizeProofText(unit.lowercase().filter { !it.isWhitespace() })
             }
 
         val result =

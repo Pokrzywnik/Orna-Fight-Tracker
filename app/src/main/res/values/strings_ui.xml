@@ -131,6 +131,15 @@
     <string name="ft_scan_interval">Scan interval (ms)</string>
     <string name="ft_high_quality_ocr">High quality OCR</string>
     <string name="ft_high_quality_ocr_desc">Disables image downscaling. May reduce performance on low-end devices</string>
+    <string name="ft_ocr_mode">OCR mode</string>
+    <string name="ft_ocr_mode_legacy">Legacy</string>
+    <string name="ft_ocr_mode_default">Default</string>
+    <string name="ft_ocr_mode_experimental">Experimental</string>
+    <string name="ft_ocr_mode_wip">WIP</string>
+    <string name="ft_ocr_mode_legacy_desc">Original single-pass scanner.</string>
+    <string name="ft_ocr_mode_default_desc">Standard two-pass scanner.</string>
+    <string name="ft_ocr_mode_experimental_desc">Existing whole-screen PaddleOCR scanner.</string>
+    <string name="ft_ocr_mode_wip_desc">New fast scanner with strict reward-row and number validation.</string>
     <string name="ft_legacy_ocr">Use legacy OCR algorithm</string>
     <string name="ft_experimental_ocr">Experimental OCR mode</string>
     <string name="ft_experimental_ocr_desc">Reads rewards with PaddleOCR (same engine as item assess) on the whole screen. Overrides the legacy OCR setting. Uses more CPU/RAM.</string>
